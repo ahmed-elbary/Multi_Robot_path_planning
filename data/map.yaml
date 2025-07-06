@@ -1,0 +1,247 @@
+- node:
+    name: Node1
+    pose:
+      position: {x: 0.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    edges:
+      - edge_id: Node1_Node2
+        node: Node2
+      - edge_id: Node1_Node4
+        node: Node4
+      - edge_id: Node1_Node5
+        node: Node5
+
+- node:
+    name: Node2
+    pose:
+      position: {x: 2.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    edges:
+      - edge_id: Node2_Node1
+        node: Node1
+      - edge_id: Node2_Node3
+        node: Node3
+      - edge_id: Node2_Node5
+        node: Node5
+
+- node:
+    name: Node3
+    pose:
+      position: {x: 4.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node3_Node2
+        node: Node2
+      - edge_id: Node3_Node6
+        node: Node6
+
+- node:
+    name: Node4
+    pose:
+      position: {x: 0.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.3826, w: 0.9238}
+    edges:
+      - edge_id: Node4_Node1
+        node: Node1
+      - edge_id: Node4_Node5
+        node: Node5
+      - edge_id: Node4_Node7
+        node: Node7
+
+- node:
+    name: Node5
+    pose:
+      position: {x: 2.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.3826, w: 0.9238}
+    edges:
+      - edge_id: Node5_Node2
+        node: Node2
+      - edge_id: Node5_Node4
+        node: Node4
+      - edge_id: Node5_Node6
+        node: Node6
+      - edge_id: Node5_Node8
+        node: Node8
+
+- node:
+    name: Node6
+    pose:
+      position: {x: 4.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node6_Node3
+        node: Node3
+      - edge_id: Node6_Node5
+        node: Node5
+
+
+- node:
+    name: Node7
+    pose:
+      position: {x: 0.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node7_Node4
+        node: Node4
+      - edge_id: Node7_Node8
+        node: Node8
+
+- node:
+    name: Node8
+    pose:
+      position: {x: 2.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node8_Node5
+        node: Node5
+      - edge_id: Node8_Node7
+        node: Node7
+      - edge_id: Node8_Node9
+        node: Node9
+      - edge_id: Node8_Node10
+        node: Node10
+
+- node:
+    name: Node9
+    pose:
+      position: {x: 4.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+
+      - edge_id: Node9_Node8
+        node: Node8
+      - edge_id: Node9_Node10
+        node: Node10
+
+- node:
+    name: Node10
+    pose:
+      position: {x: 2.0, y: 6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node10_Node8
+        node: Node8
+      - edge_id: Node10_Node9
+        node: Node9
+
+- node:
+    name: Node11
+    pose:
+      position: {x: 0.0, y: 6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node11_Node7
+        node: Node7
+      - edge_id: Node11_Node12
+        node: Node12
+
+- node:
+    name: Node12
+    pose:
+      position: {x: 2.0, y: 6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node12_Node11
+        node: Node11
+      - edge_id: Node12_Node10
+        node: Node10
+      - edge_id: Node12_Node13
+        node: Node13
+
+- node:
+    name: Node13
+    pose:
+      position: {x: 4.0, y: 6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node13_Node12
+        node: Node12
+      - edge_id: Node13_Node9
+        node: Node9
+      - edge_id: Node13_Node14
+        node: Node14
+
+- node:
+    name: Node14
+    pose:
+      position: {x: 6.0, y: 6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node14_Node13
+        node: Node13
+      - edge_id: Node14_Node15
+        node: Node15
+
+- node:
+    name: Node15
+    pose:
+      position: {x: 6.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node15_Node14
+        node: Node14
+      - edge_id: Node15_Node9
+        node: Node9
+      - edge_id: Node15_Node16
+        node: Node16
+
+- node:
+    name: Node16
+    pose:
+      position: {x: 6.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node16_Node15
+        node: Node15
+      - edge_id: Node16_Node6
+        node: Node6
+      - edge_id: Node16_Node17
+        node: Node17
+      - edge_id: Node16_Node9
+        node: Node9
+
+- node:
+    name: Node17
+    pose:
+      position: {x: 6.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Node17_Node16
+        node: Node16
+      - edge_id: Node17_Node3
+        node: Node3
+      - edge_id: Node17_Node18
+        node: Node18
+
+- node:
+    name: Node18
+    pose:
+      position: {x: 8.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    edges:
+      - edge_id: Node18_Node17
+        node: Node17
+      - edge_id: Node18_Node19
+        node: Node19
+
+- node:
+    name: Node19
+    pose:
+      position: {x: 8.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.3826, w: 0.9238}
+    edges:
+      - edge_id: Node19_Node18
+        node: Node18
+      - edge_id: Node19_Node20
+        node: Node20
+
+- node:
+    name: Node20
+    pose:
+      position: {x: 8.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
+    edges:
+      - edge_id: Node20_Node19
+        node: Node19
+      - edge_id: Node20_Node15
+        node: Node15
