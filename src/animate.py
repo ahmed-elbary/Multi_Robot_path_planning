@@ -126,7 +126,7 @@ if __name__ == "__main__":
     graph, positions = build_graph_from_yaml(topo_map)
 
     # Define multiple goals (start and waypoints)
-    multi_goal_path = ["Node1", "Node5", "Node2"]
+    multi_goal_path = ["Node1",  "Node15", "Node1"]
 
     # Build full A* path across all segments
     full_path = []

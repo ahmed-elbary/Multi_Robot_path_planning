@@ -6,7 +6,7 @@ def build_graph_from_yaml(top_map):
     Converts a YAML-formatted topological map into a NetworkX graph.
     Each node contains its position as attributes. Each edge has Euclidean distance as weight.
     """
-    G = nx.Graph()
+    G = nx.DiGraph()
     positions = {}
 
     for item in top_map:
