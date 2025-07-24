@@ -233,9 +233,9 @@ if __name__ == '__main__':
     topo_map = load_map(yaml_path)
     graph, positions = build_graph_from_yaml(topo_map)
     multi_robot_goals = [
-        ['Park1', 'Start1', 'T00', 'Spare1', 'Park1'],
-        ['Park2', 'Start1', 'T10', 'Spare1', 'Park2'],
-        ['Park3', 'Start2', 'T40', 'Spare2', 'Park3']
+        ['Park1', 'Start2', 'T00', 'Spare2', 'Park3'],
+        ['Park2', 'Start1', 'T10', 'Spare1', 'Park1'],
+        ['Park3', 'Start2', 'T40', 'Spare2', 'Park2']
     ]
     colors = ['red', 'green', 'blue']
     robot_specs = []

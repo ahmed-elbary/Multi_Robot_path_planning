@@ -41,6 +41,7 @@
 # Start nodes (3 nodes)
 - node:
     name: Start1
+    # custom_type: gateway
     pose:
       position: {x: 1.0, y: 2.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
@@ -55,9 +56,12 @@
         node: T10
       - edge_id: Start1_T20
         node: T20
+      - edge_id: Start1_Start2
+        node: Start2
 
 - node:
     name: Start2
+    # custom_type: gateway
     pose:
       position: {x: 4.0, y: 2.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
@@ -72,6 +76,8 @@
         node: T40
       - edge_id: Start2_T50
         node: T50
+      - edge_id: Start2_Start1
+        node: Start1
 
 # Tunnel rows (5 rows × 4 columns = 20 nodes)
 - node:
