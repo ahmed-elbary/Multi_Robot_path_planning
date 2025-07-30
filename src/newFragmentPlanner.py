@@ -14,12 +14,12 @@ class Agent:
         self.start = start
         self.goal = goal
         self.route: List[str] = []
-        self.active: bool = bool(goal)
+        self.active: bool = True
         self.fragments: List[List[str]] = []
         self.waiting: bool = False
-        self.arrival_times: List[float] = []
-        self.finished: bool = False
         self.wait_node: str = None
+        self.finished: bool = False
+        self.replanned: bool = False
 
 class FragmentPlanner:
     def __init__(self, yaml_file: str, agents: List[Agent]):
@@ -28,11 +28,11 @@ class FragmentPlanner:
         self.graph, self.positions = self.build_graph_from_yaml(self.topo_map)
         self.agents = agents
         self.routes = {}
+        self.occupied_nodes = set()
         self.critical_points = set()
         self.dangerous_points = set()
-        self.stopped_agents = {}
-        self.occupied_nodes = set()
-        self.collision_window = 2.0
+        self.stopped_agents: Dict[str, str] = {}
+        self.collision_window = 1.0  # seconds
 
     def load_map(self, yaml_file: str):
         with open(yaml_file, 'r') as f:
@@ -56,41 +56,44 @@ class FragmentPlanner:
         self.find_routes()
         self.update_goal_occupancy()
         self.process_routes()
-        self.critical_points = self.find_critical_points()
-        self.compute_arrival_times()
-        self.detect_temporal_conflicts()
+        self.find_critical_points()
+        self.detect_dangerous_points()
         self.split_critical_paths()
         self.print_report()
+        self.replan_waiting_agents()
         self.animate_paths()
 
     def find_routes(self):
         for agent in self.agents:
-            if not agent.goal or agent.start == agent.goal:
-                agent.active = False
-                self.occupied_nodes.add(agent.start)
+            if agent.goal is None or agent.start == agent.goal:
                 agent.route = [agent.start]
+                agent.active = False
                 continue
             try:
                 agent.route = nx.shortest_path(self.graph, agent.start, agent.goal)
             except nx.NetworkXNoPath:
                 agent.route = []
+                agent.active = False
             self.routes[agent.name] = agent.route
 
     def update_goal_occupancy(self):
         for agent in self.agents:
-            if agent.route and agent.route[-1] == agent.goal:
-                self.occupied_nodes.add(agent.goal)
-            if not agent.goal or agent.start == agent.goal:
+            if agent.goal is None or agent.start == agent.goal:
                 self.occupied_nodes.add(agent.start)
+            elif agent.route and agent.route[-1] == agent.goal:
+                self.occupied_nodes.add(agent.goal)
 
     def process_routes(self):
         for agent in self.agents:
-            if agent.route:
+            if agent.active:
                 self.process_route_for_active(agent)
             else:
                 self.process_route_for_inactive(agent)
 
     def process_route_for_active(self, agent: Agent):
+        if not agent.route:
+            self.execute_recovery_behaviour(agent)
+            return
         filtered_map = self.generate_filtered_map(agent)
         try:
             route = nx.shortest_path(filtered_map, agent.start, agent.goal)
@@ -99,128 +102,105 @@ class FragmentPlanner:
             self.execute_recovery_behaviour(agent)
 
     def process_route_for_inactive(self, agent: Agent):
+        if not agent.goal:
+            agent.route = [agent.start]
+            return
         closest = self.find_closest_node(agent.start)
         agent.route = [agent.start, closest]
-        agent.active = False
 
     def generate_filtered_map(self, agent: Agent) -> nx.Graph:
         filtered = self.graph.copy()
         for node in self.occupied_nodes:
             if node != agent.goal and node in filtered:
                 filtered.remove_node(node)
-        filtered.add_node(agent.start)
-        filtered.add_node(agent.goal)
         return filtered
 
     def execute_recovery_behaviour(self, agent: Agent):
-        agent.waiting = True
+        agent.route = [agent.start]
+        agent.active = False
 
     def find_closest_node(self, start: str) -> str:
         return min(self.graph.nodes, key=lambda n: nx.shortest_path_length(self.graph, start, n))
 
-    def compute_arrival_times(self):
-        speed_mps = 1.0
+    def find_critical_points(self):
+        point_count: Dict[str, int] = {}
         for agent in self.agents:
-            times = [0.0]
-            path = agent.route
-            for i in range(len(path) - 1):
-                x1, y1 = self.positions[path[i]]
-                x2, y2 = self.positions[path[i + 1]]
-                dist = math.hypot(x2 - x1, y2 - y1)
-                dt = dist / speed_mps
-                times.append(times[-1] + dt)
-            agent.arrival_times = times
+            for node in agent.route:
+                point_count[node] = point_count.get(node, 0) + 1
+        self.critical_points = {node for node, count in point_count.items() if count > 1}
 
-    def detect_temporal_conflicts(self):
-        node_schedule = {}
-        for agent in self.agents:
-            for i, node in enumerate(agent.route):
-                arrival = agent.arrival_times[i]
-                node_schedule.setdefault(node, []).append((agent.name, arrival))
-
-        for node, visits in node_schedule.items():
-            visits.sort(key=lambda x: x[1])
-            for i in range(len(visits) - 1):
-                a1, t1 = visits[i]
-                a2, t2 = visits[i + 1]
-                if abs(t1 - t2) < self.collision_window:
-                    self.critical_points.add(node)
-                    self.dangerous_points.add(node)
+    def detect_dangerous_points(self):
+        self.dangerous_points = set(self.critical_points)
 
     def split_critical_paths(self):
         for agent in self.agents:
             route = agent.route
+            if not route or not agent.active:
+                continue
             fragments = []
             fragment = []
             for i, node in enumerate(route):
                 if node in self.dangerous_points:
                     if not self.agent_has_priority(agent, node):
-                        prev_node = route[i - 1] if i > 0 else node
-                        agent.wait_node = prev_node
-                        self.stopped_agents[agent.name] = prev_node
                         agent.waiting = True
+                        if i > 0:
+                            agent.wait_node = route[i - 1]
                         break
                 fragment.append(node)
             if fragment:
                 agent.fragments.append(fragment)
 
-    def find_critical_points(self) -> set:
-        point_count: Dict[str, int] = {}
-        for agent in self.agents:
-            for node in agent.route:
-                point_count[node] = point_count.get(node, 0) + 1
-        return {node for node, count in point_count.items() if count > 1}
-
     def agent_has_priority(self, agent: Agent, node: str) -> bool:
-        agent_time = agent.arrival_times[agent.route.index(node)] if node in agent.route else float('inf')
-        for other in self.agents:
-            if other.name == agent.name:
-                continue
-            if node in other.route:
-                other_time = other.arrival_times[other.route.index(node)]
-                if agent_time > other_time:
+        competing_agents = [a for a in self.agents if a.name != agent.name and node in a.route]
+        agent_index = agent.route.index(node) if node in agent.route else float('inf')
+        agent_route_len = len(agent.route)
+
+        for other in competing_agents:
+            other_index = other.route.index(node)
+            other_len = len(other.route)
+            if agent_index > other_index:
+                return False
+            elif agent_index == other_index:
+                if agent_route_len > other_len:
                     return False
+                elif agent_route_len == other_len:
+                    if agent.name > other.name:
+                        return False
         return True
 
-    def is_fixed_orientation_node(self, node_name: str):
-        for item in self.topo_map:
-            node = item['node']
-            if node['name'] == node_name:
-                if node.get('custom_type') == 'fixed_orientation':
-                    return True
-                pose = node.get('pose', {})
-                if pose.get('custom_type') == 'fixed_orientation':
-                    return True
-        return False
 
-    def get_orientation_from_map(self, node_name: str):
-        for entry in self.topo_map:
-            node = entry['node']
-            if node['name'] == node_name:
-                if node.get('custom_type') == 'fixed_orientation' or node['pose'].get('custom_type') == 'fixed_orientation':
-                    q = node['pose']['orientation']
-                    z, w = q['z'], q['w']
-                    return math.atan2(2.0 * w * z, 1.0 - 2.0 * (z ** 2))
-        return None
+
+    def replan_waiting_agents(self):
+        for agent in self.agents:
+            if agent.waiting and agent.wait_node and not agent.replanned:
+                if not any(agent.wait_node in a.route for a in self.agents if a != agent):
+                    filtered_map = self.generate_filtered_map(agent)
+                    try:
+                        new_path = nx.shortest_path(filtered_map, agent.wait_node, agent.goal)
+                        agent.route = [agent.start] + new_path[1:]
+                        agent.waiting = False
+                        agent.replanned = True
+                        print(f"[✓] {agent.name} replanned from '{agent.wait_node}' to '{agent.goal}': {agent.route}")
+                    except nx.NetworkXNoPath:
+                        print(f"[x] {agent.name} could not replan from '{agent.wait_node}' to '{agent.goal}'")
+
 
     def print_report(self):
-        print("\n==== Fragment Planner Report ====")
+        print("\n==== Fragment Planner Report ====" )
         print("\n[Agents]")
         for agent in self.agents:
             print(f"- {agent.name}: start={agent.start}, goal={agent.goal}")
 
         print("\n[Agent Status]")
         for agent in self.agents:
-            if not agent.route:
-                status = "Inactive (No Route)"
+            if not agent.active:
+                print(f"- {agent.name}: Inactive (No goal)")
             elif agent.waiting:
-                status = "Waiting (Stalled at critical point)"
-            elif not agent.active:
-                status = "Inactive (No goal)"
+                print(f"- {agent.name}: Waiting (Stalled at critical point)")
             else:
-                status = "Active"
-            print(f"- {agent.name}: {status}")
+                print(f"- {agent.name}: Active")
 
+        self.update_goal_occupancy()
         print("\n[Occupied Nodes]")
         print(", ".join(sorted(self.occupied_nodes)))
 
@@ -232,23 +212,21 @@ class FragmentPlanner:
         print(", ".join(sorted(self.critical_points)))
 
         print("\n[Dangerous Collision Points (Time-Based)]")
-        if self.dangerous_points:
-            print(", ".join(sorted(self.dangerous_points)))
-        else:
-            print("None")
+        print(", ".join(sorted(self.dangerous_points)))
 
         print("\n[Stopped Agents at Critical Points]")
-        if self.stopped_agents:
-            for agent_name, node in self.stopped_agents.items():
-                print(f"- {agent_name} will wait at '{node}' to avoid dangerous point ahead")
-        else:
-            print("None")
+        for agent in self.agents:
+            if agent.waiting and agent.wait_node:
+                print(f"- {agent.name} will wait at '{agent.wait_node}' to avoid dangerous point ahead")
 
-
-
-
-
-
+    def get_orientation_from_map(self, node_name: str):
+        for entry in self.topo_map:
+            node = entry['node']
+            if node['name'] == node_name:
+                q = node['pose']['orientation']
+                z, w = q['z'], q['w']
+                return math.atan2(2.0 * w * z, 1.0 - 2.0 * (z ** 2))
+        return None
 
 
 
@@ -354,9 +332,12 @@ class FragmentPlanner:
 if __name__ == "__main__":
     yaml_file = "data/map.yaml"
     agents = [
-        Agent("Robot1", "Park1", "T03"),
-        Agent("Robot2", "T12", "T12"),
-        Agent("Robot3", "T11", "T03"),
+        Agent("Robot1", "Park1", "T01"),
+        Agent("Robot2", "T12", "T52"),
+        Agent("Robot3", "T11", "T32"),
+        Agent("Robot4", "Park2", "T33"),
+
     ]
     planner = FragmentPlanner(yaml_file, agents)
     planner.run()
+

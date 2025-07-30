@@ -21,7 +21,7 @@
 - node:
     name: Park2
     pose:
-      position: {x: 1.5, y: 0.0, z: 0.0}
+      position: {x: 1.0, y: 0.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges: 
@@ -31,7 +31,7 @@
 - node:
     name: Park3
     pose:
-      position: {x: 3.5, y: 0.0, z: 0.0}
+      position: {x: 4.0, y: 0.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
@@ -44,7 +44,7 @@
     # custom_type: gateway
     pose:
       position: {x: 1.0, y: 2.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
     edges:
       - edge_id: Start1_Park1
         node: Park1
@@ -64,7 +64,8 @@
     # custom_type: gateway
     pose:
       position: {x: 4.0, y: 2.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: Start2_Park1
         node: Park1
@@ -84,7 +85,8 @@
     name: T00
     pose:
       position: {x: 0.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T00_T01
         node: T01
@@ -95,7 +97,8 @@
     name: T01
     pose:
       position: {x: 0.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T01_T02
         node: T02
@@ -106,7 +109,8 @@
     name: T02
     pose:
       position: {x: 0.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T02_T03
         node: T03
@@ -117,7 +121,8 @@
     name: T03
     pose:
       position: {x: 0.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T03_T02
         node: T02
@@ -128,7 +133,8 @@
     name: T10
     pose:
       position: {x: 1.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T10_T11
         node: T11
@@ -139,7 +145,8 @@
     name: T11
     pose:
       position: {x: 1.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T11_T12
         node: T12
@@ -150,7 +157,8 @@
     name: T12
     pose:
       position: {x: 1.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T12_T13
         node: T13
@@ -161,7 +169,8 @@
     name: T13
     pose:
       position: {x: 1.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T13_T12
         node: T12
@@ -172,7 +181,8 @@
     name: T20
     pose:
       position: {x: 2.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T20_T21
         node: T21
@@ -183,7 +193,8 @@
     name: T21
     pose:
       position: {x: 2.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T21_T22
         node: T22
@@ -194,7 +205,8 @@
     name: T22
     pose:
       position: {x: 2.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T22_T23
         node: T23
@@ -205,7 +217,8 @@
     name: T23
     pose:
       position: {x: 2.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T23_T22
         node: T22
@@ -216,7 +229,8 @@
     name: T30
     pose:
       position: {x: 3.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T30_T31
         node: T31
@@ -227,7 +241,8 @@
     name: T31
     pose:
       position: {x: 3.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T31_T32
         node: T32
@@ -238,7 +253,8 @@
     name: T32
     pose:
       position: {x: 3.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T32_T33
         node: T33
@@ -249,7 +265,8 @@
     name: T33
     pose:
       position: {x: 3.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T33_T32
         node: T32
@@ -260,7 +277,8 @@
     name: T40
     pose:
       position: {x: 4.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T40_T41
         node: T41
@@ -271,7 +289,8 @@
     name: T41
     pose:
       position: {x: 4.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T41_T42
         node: T42
@@ -282,7 +301,8 @@
     name: T42
     pose:
       position: {x: 4.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T42_T43
         node: T43
@@ -293,7 +313,8 @@
     name: T43
     pose:
       position: {x: 4.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T43_T42
         node: T42
@@ -304,7 +325,8 @@
     name: T50
     pose:
       position: {x: 5.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T50_T51
         node: T51
@@ -315,7 +337,8 @@
     name: T51
     pose:
       position: {x: 5.0, y: 5.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T51_T52
         node: T52
@@ -326,7 +349,8 @@
     name: T52
     pose:
       position: {x: 5.0, y: 7.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T52_T53
         node: T53
@@ -337,7 +361,8 @@
     name: T53
     pose:
       position: {x: 5.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
     edges:
       - edge_id: T53_T52
         node: T52
