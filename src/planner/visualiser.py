@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import FancyArrowPatch
 import math
+from planner.planner_core import replan_waiting_agents
+from matplotlib.animation import FFMpegWriter
 
 
-def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10, wait_time=3.0, show_legend=False):
+def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10, wait_time=3.0, show_legend=False, graph=None, save=False):
     fig, ax = plt.subplots(figsize=(10, 7))
     ax.set_title("Multi-Robot Path Animation")
     ax.axis('equal')
@@ -31,21 +33,11 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
     trails = []
     max_frames = 0
 
-    for idx, agent in enumerate(agents):
-        path = agent.full_route if agent.full_route else agent.route
-        if not path:
-            # Show static robot at start position if it exists in positions
-            if agent.start in positions:
-                x, y = positions[agent.start]
-                ax.plot(x, y, 'o', color=colors[idx % len(colors)], markersize=8)
-                ax.text(x + 0.2, y + 0.2, agent.name, fontsize=8, color=colors[idx % len(colors)])
-            else:
-                print(f"[!] Warning: Start node '{agent.start}' not found in positions for {agent.name}")
-            continue
-        if len(path) < 2:
-            continue
-
+    def generate_coords(agent):
         coords, angles = [], []
+        path = agent.full_route if agent.full_route else agent.route
+        if not path or len(path) < 2:
+            return coords, angles
         for i in range(len(path) - 1):
             x1, y1 = positions[path[i]]
             x2, y2 = positions[path[i + 1]]
@@ -60,6 +52,18 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         final_angle = get_orientation_from_map(path[-1]) or angles[-1]
         while len(angles) < len(coords):
             angles.append(final_angle)
+        return coords, angles
+
+    for idx, agent in enumerate(agents):
+        path = agent.full_route if agent.full_route else agent.route
+        if not path:
+            if agent.start in positions:
+                x, y = positions[agent.start]
+                ax.plot(x, y, 'o', color=colors[idx % len(colors)], markersize=8)
+                ax.text(x + 0.2, y + 0.2, agent.name, fontsize=8, color=colors[idx % len(colors)])
+            continue
+
+        coords, angles = generate_coords(agent)
 
         if agent.wait_node:
             wait_pos = positions[agent.wait_node]
@@ -84,39 +88,23 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         max_frames = max(max_frames, len(coords))
 
     def update(frame):
+        if graph:
+            replan_waiting_agents(agents, graph, frame=frame, fps=fps)
+            for trail in trails:
+                agent = trail['agent']
+                if agent.replanned and not agent.waiting:
+                    coords, angles = generate_coords(agent)
+                    agent.dynamic_coords = coords
+                    agent.dynamic_angles = angles
+                    trail['coords'] = coords
+                    trail['angles'] = angles
+
         for trail in trails:
             agent = trail['agent']
             coords = agent.dynamic_coords
             angles = agent.dynamic_angles
-
-            if agent.waiting and agent.wait_node:
-                current_idx = agent.full_route.index(agent.wait_node)
-                try:
-                    next_node = agent.full_route[current_idx + 1]
-                except IndexError:
-                    continue
-                blockers = [a for a in agents if a.name != agent.name and next_node in a.route]
-                if not any(b.priority() < agent.priority() for b in blockers):
-                    agent.waiting = False
-                    coords, angles = [], []
-                    path = agent.full_route[current_idx:]
-                    for i in range(len(path) - 1):
-                        x1, y1 = positions[path[i]]
-                        x2, y2 = positions[path[i + 1]]
-                        steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
-                        for t in range(steps):
-                            alpha = t / steps
-                            x = (1 - alpha) * x1 + alpha * x2
-                            y = (1 - alpha) * y1 + alpha * y2
-                            coords.append((x, y))
-                            angles.append(math.atan2(y2 - y1, x2 - x1))
-                    coords.append(positions[path[-1]])
-                    final_angle = get_orientation_from_map(path[-1]) or angles[-1]
-                    while len(angles) < len(coords):
-                        angles.append(final_angle)
-                    agent.dynamic_coords = coords
-                    agent.dynamic_angles = angles
-
+            if not coords:
+                continue
             idx = min(frame, len(agent.dynamic_coords) - 1)
             x, y = agent.dynamic_coords[idx]
             yaw = agent.dynamic_angles[idx]
@@ -131,14 +119,12 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
             ax.add_patch(trail['arrow'])
         return [obj for trail in trails for obj in (trail['dot'], trail['arrow']) if obj is not None]
 
-    # Ensure inactive agents appear in every frame
     for idx, agent in enumerate(agents):
         if agent.goal is None and agent.start in positions:
             x, y = positions[agent.start]
             dot, = ax.plot([x], [y], 'o', color=colors[idx % len(colors)], markersize=8)
             ax.text(x + 0.2, y + 0.2, agent.name, fontsize=8, color=colors[idx % len(colors)])
 
-     
     if show_legend:
         from matplotlib.lines import Line2D
         legend_elements = [
@@ -149,4 +135,13 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         ax.legend(handles=legend_elements, loc='upper right')
 
     ani = animation.FuncAnimation(fig, update, frames=max_frames, interval=100, blit=True, repeat=False)
-    plt.show()
+
+
+    if save:
+        import os
+        os.makedirs("output", exist_ok=True)
+        ani.save("output/animation.gif", writer="pillow", fps=fps)
+        print("[✓] Animation saved to output/animation.gif")
+    else:
+        plt.show()
+
