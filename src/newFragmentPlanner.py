@@ -24,7 +24,9 @@ class Agent:
         self.dynamic_coords = []
         self.dynamic_angles = []
         self.wait_counter = 0
+        
 
+        
     def priority(self):
         return int(self.name.replace("Robot", ""))
 
@@ -39,7 +41,7 @@ class FragmentPlanner:
         self.critical_points = set()
         self.dangerous_points = set()
         self.stopped_agents: Dict[str, str] = {}
-        self.collision_window = 1.0  # seconds
+        self.collision_window = 5.0  # seconds
         self.deadlock_logs = []
 
     def load_map(self, yaml_file: str):
@@ -66,11 +68,12 @@ class FragmentPlanner:
         self.process_routes()
         self.find_critical_points()
         self.detect_dangerous_points()
+        self.resolve_all_waits()
         self.assign_waiting_agents()
         self.split_critical_paths()
         self.print_report()
-        self.replan_waiting_agents()
-        self.detect_deadlocks()
+        # self.replan_waiting_agents()
+        # self.detect_deadlocks()
         self.animate_paths()
 
 
@@ -175,6 +178,18 @@ class FragmentPlanner:
                         self.detected_dangerous_points.setdefault(node, set()).update([name_i, name_j])
 
 
+    def resolve_all_waits(self):
+        any_waiting = True
+        while any_waiting:
+            before = {a.name for a in self.agents if a.waiting}
+            self.assign_waiting_agents()
+            after = {a.name for a in self.agents if a.waiting}
+            new_waiters = after - before
+            any_waiting = bool(new_waiters)
+            if new_waiters:
+                self.replan_waiting_agents()
+                
+    
     def split_critical_paths(self):
         for agent in self.agents:
             route = agent.route
@@ -235,24 +250,34 @@ class FragmentPlanner:
         for node, robot_names in self.detected_dangerous_points.items():
             if len(robot_names) <= 1:
                 continue
-            sorted_robots = sorted(robot_names, key=lambda name: int(name.replace("Robot", "")))
-            for loser_name in sorted_robots[1:]:  # All but the top-priority
-                loser = next((a for a in self.agents if a.name == loser_name), None)
-                if loser:
-                    try:
-                        idx = loser.route.index(node)
-                        if idx > 0:
-                            loser.wait_node = loser.route[idx - 1]
-                        else:
-                            loser.wait_node = node
-                        loser.waiting = True
-                        # NEW: Save full route for reasoning
-                        if not loser.full_route:
-                            loser.full_route = loser.route[:]
-                        # Trim route to wait node
-                        loser.route = loser.route[:idx]
-                    except ValueError:
-                        continue
+
+            # Get fragments for each involved robot
+            robot_objs = [a for a in self.agents if a.name in robot_names]
+            robot_fragments = {a.name: a.route for a in robot_objs if a.route}
+
+            # Prioritize by robot ID
+            sorted_robots = sorted(robot_objs, key=lambda a: a.priority())
+            winner = sorted_robots[0]
+            others = sorted_robots[1:]
+
+            for loser in others:
+                # Identify earliest intersection between loser's route and winner's route
+                intersection_idx = None
+                for idx, node in enumerate(loser.route):
+                    if node in winner.route:
+                        intersection_idx = idx
+                        break
+
+                if intersection_idx is not None:
+                    # Set wait node as the node before the intersection point
+                    wait_idx = max(intersection_idx - 1, 0)
+                    loser.wait_node = loser.route[wait_idx]
+                    loser.waiting = True
+
+                    if not loser.full_route:
+                        loser.full_route = loser.route[:]
+                    loser.route = loser.route[:wait_idx + 1]
+
 
     def detect_deadlocks(self):
         deadlocks = []
@@ -282,23 +307,47 @@ class FragmentPlanner:
             if agent.waiting and agent.wait_node and agent.full_route:
                 try:
                     idx = agent.full_route.index(agent.wait_node)
-                    if idx + 1 < len(agent.full_route):
-                        my_edge = (agent.full_route[idx], agent.full_route[idx+1])
-                        for other in self.agents:
-                            if other.name == agent.name or not other.full_route:
-                                continue
-                            for i in range(len(other.full_route) - 1):
-                                other_edge = (other.full_route[i], other.full_route[i+1])
-                                if other_edge == my_edge[::-1]:
-                                    key = tuple(sorted([agent.name, other.name]))
-                                    if key not in seen_pairs:
-                                        seen_pairs.add(key)
-                                        deadlocks.append((agent.name, other.name, my_edge))
-                                        if agent.priority() < other.priority():
-                                            msg = f"[PRIORITY] {agent.name} allowed to proceed due to higher priority"
-                                        else:
-                                            msg = f"[PRIORITY] {other.name} allowed to proceed due to higher priority"
-                                        self.deadlock_logs.append(msg)
+                    for offset in range(1, 4):  # Check next 3 segments (coming path)
+                        if idx + offset < len(agent.full_route):
+                            my_edge = (agent.full_route[idx + offset - 1], agent.full_route[idx + offset])
+                            for other in self.agents:
+                                if other.name == agent.name or not other.full_route:
+                                    continue
+                                for i in range(len(other.full_route) - 1):
+                                    other_edge = (other.full_route[i], other.full_route[i+1])
+                                    if my_edge == other_edge[::-1]:
+                                        key = tuple(sorted([agent.name, other.name]))
+                                        if key not in seen_pairs:
+                                            seen_pairs.add(key)
+                                            deadlocks.append((agent.name, other.name, my_edge))
+                                            if agent.priority() < other.priority():
+                                                msg = f"[PRIORITY] {agent.name} allowed to proceed due to higher priority"
+                                            else:
+                                                msg = f"[PRIORITY] {other.name} allowed to proceed due to higher priority"
+                                            self.deadlock_logs.append(msg)
+                                    # Also check if other agent's upcoming segment matches our direction (not just inverse)
+                                    elif my_edge == other_edge:
+                                        # This might mean both are trying to go through same edge in same direction
+                                        # This isn't deadlock but still could imply congestion
+                                        continue
+
+                    # NEW: Check if other robots' paths include our full_route (in reverse)
+                    reversed_path = list(reversed(agent.full_route[idx:idx+4]))
+                    for other in self.agents:
+                        if other.name == agent.name or not other.full_route:
+                            continue
+                        for i in range(len(other.full_route) - len(reversed_path) + 1):
+                            if other.full_route[i:i+len(reversed_path)] == reversed_path:
+                                key = tuple(sorted([agent.name, other.name]))
+                                if key not in seen_pairs:
+                                    seen_pairs.add(key)
+                                    deadlocks.append((agent.name, other.name, (reversed_path[1], reversed_path[0])))
+                                    if agent.priority() < other.priority():
+                                        msg = f"[PRIORITY] {agent.name} allowed to proceed due to higher priority"
+                                    else:
+                                        msg = f"[PRIORITY] {other.name} allowed to proceed due to higher priority"
+                                    self.deadlock_logs.append(msg)
+
                 except ValueError:
                     continue
 
@@ -387,153 +436,131 @@ class FragmentPlanner:
 
 
     def animate_paths(self):
-            fig, ax = plt.subplots(figsize=(10, 7))
-            ax.set_title("Multi-Robot Path Animation")
-            ax.axis('equal')
-            ax.grid(False)
+        fig, ax = plt.subplots(figsize=(10, 7))
+        ax.set_title("Multi-Robot Path Animation")
+        ax.axis('equal')
+        ax.grid(False)
 
-            for entry in self.topo_map:
-                node = entry['node']
-                name = node['name']
-                x, y = self.positions[name]
-                ax.scatter(x, y, c='blue')
-                ax.text(x+0.1, y-0.1, name, fontsize=9)
-                for edge in node.get('edges', []):
-                    to_node = edge['node']
-                    if to_node in self.positions:
-                        x2, y2 = self.positions[to_node]
-                        ax.plot([x, x2], [y, y2], color='gray')
-                        dx, dy = x2 - x, y2 - y
-                        ax.add_patch(FancyArrowPatch((x + 0.25*dx, y + 0.25*dy),
-                                                     (x + 0.30*dx, y + 0.30*dy),
-                                                     arrowstyle='-|>', mutation_scale=15, color='gray'))
+        for entry in self.topo_map:
+            node = entry['node']
+            name = node['name']
+            x, y = self.positions[name]
+            ax.scatter(x, y, c='blue')
+            ax.text(x + 0.1, y - 0.1, name, fontsize=9)
+            for edge in node.get('edges', []):
+                to_node = edge['node']
+                if to_node in self.positions:
+                    x2, y2 = self.positions[to_node]
+                    ax.plot([x, x2], [y, y2], color='gray')
+                    dx, dy = x2 - x, y2 - y
+                    ax.add_patch(FancyArrowPatch((x + 0.25 * dx, y + 0.25 * dy),
+                                                 (x + 0.30 * dx, y + 0.30 * dy),
+                                                 arrowstyle='-|>', mutation_scale=15, color='gray'))
 
-            colors = ['red', 'green', 'blue', 'orange', 'purple']
-            trails = []
-            max_frames = 0
-            fps = 10
-            wait_time = 3.0
+        colors = ['red', 'green', 'blue', 'orange', 'purple']
+        trails = []
+        max_frames = 0
+        fps = 10
+        wait_time = 3.0
 
-            for idx, agent in enumerate(self.agents):
-                path = agent.route
-                coords = []
-                angles = []
-                for i in range(len(path) - 1):
-                    x1, y1 = self.positions[path[i]]
-                    x2, y2 = self.positions[path[i + 1]]
-                    steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
-                    for t in range(steps):
-                        alpha = t / steps
-                        x = (1 - alpha) * x1 + alpha * x2
-                        y = (1 - alpha) * y1 + alpha * y2
-                        coords.append((x, y))
-                        angles.append(math.atan2(y2 - y1, x2 - x1))
+        for idx, agent in enumerate(self.agents):
+            path = agent.full_route if agent.full_route else agent.route
+            if not path or len(path) < 2:
+                continue
+            coords = []
+            angles = []
+            for i in range(len(path) - 1):
+                x1, y1 = self.positions[path[i]]
+                x2, y2 = self.positions[path[i + 1]]
+                steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
+                for t in range(steps):
+                    alpha = t / steps
+                    x = (1 - alpha) * x1 + alpha * x2
+                    y = (1 - alpha) * y1 + alpha * y2
+                    coords.append((x, y))
+                    angles.append(math.atan2(y2 - y1, x2 - x1))
 
-                final_pos = self.positions[path[-1]]
-                coords.append(final_pos)
+            final_pos = self.positions[path[-1]]
+            coords.append(final_pos)
+            final_angle = self.get_orientation_from_map(path[-1]) or angles[-1]
+            while len(angles) < len(coords):
+                angles.append(final_angle)
 
-                final_angle = self.get_orientation_from_map(path[-1])
-                if final_angle is None and len(path) >= 2:
-                    x1, y1 = self.positions[path[-2]]
-                    x2, y2 = final_pos
-                    final_angle = math.atan2(y2 - y1, x2 - x1)
-                elif final_angle is None:
-                    final_angle = 0.0
+            if agent.wait_node:
+                wait_pos = self.positions[agent.wait_node]
+                try:
+                    wait_idx = next(i for i, p in enumerate(coords)
+                                    if math.isclose(p[0], wait_pos[0], abs_tol=1e-3)
+                                    and math.isclose(p[1], wait_pos[1], abs_tol=1e-3))
+                    wait_frames = int(wait_time * fps)
+                    coords[wait_idx:wait_idx] = [wait_pos] * wait_frames
+                    angles[wait_idx:wait_idx] = [angles[wait_idx]] * wait_frames
+                except StopIteration:
+                    pass
 
-                while len(angles) < len(coords):
-                    angles.append(final_angle)
+            xs, ys = zip(*[self.positions[n] for n in path if n in self.positions])
+            ax.plot(xs, ys, '--', color=colors[idx % len(colors)], linewidth=2)
 
-                if agent.wait_node:
-                    wait_pos = self.positions[agent.wait_node]
+            dot, = ax.plot([], [], 'o', color=colors[idx % len(colors)], markersize=8)
+            arrow = None
+            trails.append({'coords': coords, 'angles': angles, 'dot': dot, 'arrow': arrow, 'color': colors[idx % len(colors)], 'agent': agent})
+            agent.dynamic_coords = coords.copy()
+            agent.dynamic_angles = angles.copy()
+            max_frames = max(max_frames, len(coords))
+
+        def update(frame):
+            for trail in trails:
+                agent = trail['agent']
+                coords = agent.dynamic_coords
+                angles = agent.dynamic_angles
+
+                if agent.waiting and agent.wait_node:
+                    current_idx = agent.full_route.index(agent.wait_node)
                     try:
-                        wait_idx = next(i for i, p in enumerate(coords) if math.isclose(p[0], wait_pos[0], abs_tol=1e-3) and math.isclose(p[1], wait_pos[1], abs_tol=1e-3))
-                        wait_frames = int(wait_time * fps)
-                        coords[wait_idx:wait_idx] = [wait_pos] * wait_frames
-                        angles[wait_idx:wait_idx] = [angles[wait_idx]] * wait_frames
-                    except StopIteration:
-                        pass
+                        next_node = agent.full_route[current_idx + 1]
+                    except IndexError:
+                        continue
+                    blocking_agents = [a for a in self.agents if a.name != agent.name and next_node in a.route]
+                    should_wait = any(a.priority() < agent.priority() for a in blocking_agents)
 
-                xs, ys = zip(*[self.positions[n] for n in path if n in self.positions])
-                ax.plot(xs, ys, '--', color=colors[idx % len(colors)], linewidth=2)
+                    if not should_wait:
+                        agent.waiting = False
+                        coords = []
+                        angles = []
+                        path = agent.full_route[current_idx:]
+                        for i in range(len(path) - 1):
+                            x1, y1 = self.positions[path[i]]
+                            x2, y2 = self.positions[path[i + 1]]
+                            steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
+                            for t in range(steps):
+                                alpha = t / steps
+                                x = (1 - alpha) * x1 + alpha * x2
+                                y = (1 - alpha) * y1 + alpha * y2
+                                coords.append((x, y))
+                                angles.append(math.atan2(y2 - y1, x2 - x1))
+                        coords.append(self.positions[path[-1]])
+                        final_angle = self.get_orientation_from_map(path[-1]) or angles[-1]
+                        while len(angles) < len(coords):
+                            angles.append(final_angle)
+                        agent.dynamic_coords = coords
+                        agent.dynamic_angles = angles
 
-                dot, = ax.plot([], [], 'o', color=colors[idx % len(colors)], markersize=8)
-                arrow = None
-                trails.append({'coords': coords, 'angles': angles, 'dot': dot, 'arrow': arrow, 'color': colors[idx % len(colors)], 'agent': agent})
-                agent.dynamic_coords = coords.copy()
-                agent.dynamic_angles = angles.copy()
-                max_frames = max(max_frames, len(coords))
+                idx = min(frame, len(agent.dynamic_coords) - 1)
+                x, y = agent.dynamic_coords[idx]
+                yaw = agent.dynamic_angles[idx]
+                dx = 0.5 * math.cos(yaw)
+                dy = 0.5 * math.sin(yaw)
+                trail['dot'].set_data([x], [y])
+                if trail['arrow']:
+                    trail['arrow'].remove()
+                trail['arrow'] = FancyArrowPatch((x, y), (x + dx, y + dy),
+                                                 arrowstyle='-|>', mutation_scale=20,
+                                                 color=trail['color'])
+                ax.add_patch(trail['arrow'])
+            return [obj for trail in trails for obj in (trail['dot'], trail['arrow']) if obj is not None]
 
-            def update(frame):
-                for trail in trails:
-                    agent = trail['agent']
-                    coords = agent.dynamic_coords
-                    angles = agent.dynamic_angles
-
-                    if agent.waiting and agent.wait_node:
-                        agent.wait_counter += 1
-                        agent_next = agent.route[agent.route.index(agent.wait_node)+1]
-                        danger_ahead = any(agent_next in a.route for a in self.agents if a != agent)
-
-                        # Deadlock detection: mutual block (even if other is not waiting)
-                        for other in self.agents:
-                            if other.name != agent.name and other.route:
-                                for i in range(len(other.route) - 1):
-                                    if other.route[i] == agent_next and other.route[i+1] == agent.wait_node:
-                                        print(f"[DEADLOCK DETECTED] {agent.name} ↔ {other.name} at edge ({agent.wait_node} ↔ {agent_next})")
-                                        if agent.priority() < other.priority():
-                                            print(f"[PRIORITY] {agent.name} allowed to proceed due to higher priority")
-                                            danger_ahead = False
-                                        break
-
-                        if not danger_ahead and not agent.replanned:
-                            filtered_map = self.generate_filtered_map(agent)
-                            try:
-                                new_path = nx.shortest_path(filtered_map, agent.wait_node, agent.goal)
-                                full_path = [agent.wait_node] + new_path[1:]
-                                coords = []
-                                angles = []
-                                for i in range(len(full_path) - 1):
-                                    x1, y1 = self.positions[full_path[i]]
-                                    x2, y2 = self.positions[full_path[i + 1]]
-                                    steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
-                                    for t in range(steps):
-                                        alpha = t / steps
-                                        x = (1 - alpha) * x1 + alpha * x2
-                                        y = (1 - alpha) * y1 + alpha * y2
-                                        coords.append((x, y))
-                                        angles.append(math.atan2(y2 - y1, x2 - x1))
-                                final_pos = self.positions[full_path[-1]]
-                                coords.append(final_pos)
-                                final_angle = self.get_orientation_from_map(full_path[-1])
-                                if final_angle is None:
-                                    x1, y1 = self.positions[full_path[-2]]
-                                    x2, y2 = final_pos
-                                    final_angle = math.atan2(y2 - y1, x2 - x1)
-                                while len(angles) < len(coords):
-                                    angles.append(final_angle)
-                                agent.dynamic_coords = coords
-                                agent.dynamic_angles = angles
-                                agent.replanned = True
-                                agent.waiting = False
-                            except nx.NetworkXNoPath:
-                                pass
-
-                    idx = min(frame, len(agent.dynamic_coords) - 1)
-                    x, y = agent.dynamic_coords[idx]
-                    yaw = agent.dynamic_angles[idx]
-                    dx = 0.5 * math.cos(yaw)
-                    dy = 0.5 * math.sin(yaw)
-                    trail['dot'].set_data([x], [y])
-                    if trail['arrow']:
-                        trail['arrow'].remove()
-                    trail['arrow'] = FancyArrowPatch((x, y), (x+dx, y+dy),
-                                                     arrowstyle='-|>', mutation_scale=20,
-                                                     color=trail['color'])
-                    ax.add_patch(trail['arrow'])
-                return [obj for trail in trails for obj in (trail['dot'], trail['arrow']) if obj is not None]
-
-            ani = animation.FuncAnimation(fig, update, frames=max_frames, interval=100, blit=True, repeat=False)
-            plt.show()
+        ani = animation.FuncAnimation(fig, update, frames=max_frames, interval=100, blit=True, repeat=False)
+        plt.show()
 
 
 
@@ -541,9 +568,9 @@ if __name__ == "__main__":
     yaml_file = "data/map.yaml"
     agents = [
         Agent("Robot1", "Park1", "T01"),
-        Agent("Robot2", "T12", "T52"),
-        Agent("Robot3", "T11", "T32"),
-        Agent("Robot4", "Park2", "T33"),
+        Agent("Robot2", "Park2", "T52"),
+        Agent("Robot3", "Park3", "T00"),
+        Agent("Robot4", "Spare2", "T51"),
 
     ]
     planner = FragmentPlanner(yaml_file, agents)
