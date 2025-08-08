@@ -1,4 +1,3 @@
-
 from typing import List
 
 class Agent:
@@ -17,7 +16,11 @@ class Agent:
         self.dynamic_coords = []
         self.dynamic_angles = []
         self.wait_counter = 0
+        self.original_path_length: int = 0
+        self.arrival_time: float = 0.0
+        self.resume_time: float = 0.0
+        self.current_fragment_idx = 0
+        self.current_node = self.start
 
     def priority(self) -> int:
-        # Defines agent priority (lower value = higher priority)
         return int(self.name.replace("Robot", ""))

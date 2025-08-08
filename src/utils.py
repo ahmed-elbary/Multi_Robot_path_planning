@@ -22,18 +22,15 @@ def build_graph_from_yaml(data: list) -> nx.Graph:
 def euclidean_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
     return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-def get_occupied_nodes(agents, graph: nx.Graph, proximity_thresh: float = 0.5) -> List[str]:
+def get_occupied_nodes(agents, graph, proximity_thresh: float = 0.5) -> list:
     occupied = set()
     for agent in agents:
         if agent.active:
-            for node in agent.route:
-                occupied.add(node)
-                # Add nodes within proximity threshold
-                node_pos = graph.nodes[node]['pos']
-                for other in graph.nodes:
-                    if other != node and euclidean_distance(node_pos, graph.nodes[other]['pos']) < proximity_thresh:
-                        occupied.add(other)
+            for step in agent.route:
+                if isinstance(step, tuple):
+                    occupied.update(step[:2])
     return list(occupied)
+
 
 def generate_filtered_map(graph: nx.Graph, occupied_nodes: List[str], start: str, goal: str) -> nx.Graph:
     G = graph.copy()

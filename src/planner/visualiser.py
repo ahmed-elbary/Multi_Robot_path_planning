@@ -1,11 +1,8 @@
-# src/planner/visualizer.py
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import FancyArrowPatch
 import math
 from planner.planner_core import replan_waiting_agents
-from matplotlib.animation import FFMpegWriter
-
 
 def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10, wait_time=3.0, show_legend=False, graph=None, save=False):
     fig, ax = plt.subplots(figsize=(10, 7))
@@ -29,19 +26,37 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
                                              (x + 0.30 * dx, y + 0.30 * dy),
                                              arrowstyle='-|>', mutation_scale=15, color='gray'))
 
-    colors = ['red', 'green', 'blue', 'orange', 'purple']
+    colors = ['red', 'blue', 'green', 'orange', 'purple']
     trails = []
     max_frames = 0
 
-    def generate_coords(agent):
-        coords, angles = [], []
+    for idx, agent in enumerate(agents):
+        # Highlight start and goal with unfilled shapes
+        if agent.start in positions:
+            sx, sy = positions[agent.start]
+            ax.plot(sx, sy, marker=(3, 0, 0), markerfacecolor='none', markeredgecolor=colors[idx % len(colors)], markersize=20)  # triangle
+        if agent.goal and agent.goal in positions:
+            gx, gy = positions[agent.goal]
+            ax.plot(gx, gy, marker='s', markerfacecolor='none', markeredgecolor=colors[idx % len(colors)], markersize=13)  # square
+
         path = agent.full_route if agent.full_route else agent.route
-        if not path or len(path) < 2:
-            return coords, angles
+        if not path:
+            if agent.start in positions:
+                x, y = positions[agent.start]
+                ax.plot(x, y, 'o', color=colors[idx % len(colors)], markersize=8)
+                ax.text(x + 0.2, y + 0.2, agent.name, fontsize=8, color=colors[idx % len(colors)])
+            else:
+                print(f"[!] Warning: Start node '{agent.start}' not found in positions for {agent.name}")
+            continue
+        if len(path) < 2:
+            continue
+
+        coords, angles = [], []
         for i in range(len(path) - 1):
             x1, y1 = positions[path[i]]
             x2, y2 = positions[path[i + 1]]
             steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
+
             for t in range(steps):
                 alpha = t / steps
                 x = (1 - alpha) * x1 + alpha * x2
@@ -52,18 +67,6 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         final_angle = get_orientation_from_map(path[-1]) or angles[-1]
         while len(angles) < len(coords):
             angles.append(final_angle)
-        return coords, angles
-
-    for idx, agent in enumerate(agents):
-        path = agent.full_route if agent.full_route else agent.route
-        if not path:
-            if agent.start in positions:
-                x, y = positions[agent.start]
-                ax.plot(x, y, 'o', color=colors[idx % len(colors)], markersize=8)
-                ax.text(x + 0.2, y + 0.2, agent.name, fontsize=8, color=colors[idx % len(colors)])
-            continue
-
-        coords, angles = generate_coords(agent)
 
         if agent.wait_node:
             wait_pos = positions[agent.wait_node]
@@ -71,11 +74,24 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
                 wait_idx = next(i for i, p in enumerate(coords)
                                 if math.isclose(p[0], wait_pos[0], abs_tol=1e-3)
                                 and math.isclose(p[1], wait_pos[1], abs_tol=1e-3))
-                wait_frames = int(wait_time * fps)
+                
+                # Estimate wait duration from timestamps in route
+                if hasattr(agent, "route") and len(agent.route) >= 1:
+                    last_leg = agent.route[-1]
+                    wait_start = last_leg[3]  # arrival time at wait_node
+                    next_start = agent.fragments[0][0][2] if agent.fragments and len(agent.fragments[0]) > 0 else wait_start + 1.0
+                    wait_duration = max(0.0, next_start - wait_start)
+                else:
+                    wait_duration = wait_time  # fallback
+                
+                wait_frames = int(wait_duration * fps)
                 coords[wait_idx:wait_idx] = [wait_pos] * wait_frames
                 angles[wait_idx:wait_idx] = [angles[wait_idx]] * wait_frames
+                print(f"[Visualizer] {agent.name} is set to wait at {agent.wait_node} for {wait_frames} frames (≈{wait_duration:.2f}s).")
+
             except StopIteration:
-                pass
+                print(f"[!] {agent.name}: Wait node {agent.wait_node} not found in coordinates.")
+
 
         xs, ys = zip(*[positions[n] for n in path if n in positions])
         ax.plot(xs, ys, '--', color=colors[idx % len(colors)], linewidth=2)
@@ -88,23 +104,20 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         max_frames = max(max_frames, len(coords))
 
     def update(frame):
-        if graph:
-            replan_waiting_agents(agents, graph, frame=frame, fps=fps)
-            for trail in trails:
-                agent = trail['agent']
-                if agent.replanned and not agent.waiting:
-                    coords, angles = generate_coords(agent)
-                    agent.dynamic_coords = coords
-                    agent.dynamic_angles = angles
-                    trail['coords'] = coords
-                    trail['angles'] = angles
-
         for trail in trails:
+            print(f"Frame: {frame}")
             agent = trail['agent']
+            idx = min(frame, len(agent.dynamic_coords) - 1)
+            x, y = agent.dynamic_coords[idx]
+            print(f"{agent.name} position at frame {frame}: {x}, {y}")
             coords = agent.dynamic_coords
             angles = agent.dynamic_angles
-            if not coords:
-                continue
+
+            if graph and agent.waiting and agent.wait_node and not agent.replanned:
+                replan_waiting_agents([agent], graph, frame=frame, fps=fps)
+                coords = agent.dynamic_coords
+                angles = agent.dynamic_angles
+
             idx = min(frame, len(agent.dynamic_coords) - 1)
             x, y = agent.dynamic_coords[idx]
             yaw = agent.dynamic_angles[idx]
@@ -129,13 +142,12 @@ def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10,
         from matplotlib.lines import Line2D
         legend_elements = [
             Line2D([0], [0], marker='o', color='w', label=agent.name,
-                markerfacecolor=colors[idx % len(colors)], markersize=8)
+                   markerfacecolor=colors[idx % len(colors)], markersize=8)
             for idx, agent in enumerate(agents)
         ]
         ax.legend(handles=legend_elements, loc='upper right')
 
     ani = animation.FuncAnimation(fig, update, frames=max_frames, interval=100, blit=True, repeat=False)
-
 
     if save:
         import os

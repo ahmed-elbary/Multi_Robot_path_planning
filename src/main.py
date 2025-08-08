@@ -1,30 +1,31 @@
-# src/main.py
 import argparse
+import math
 from planner.agent import Agent
-from planner.planner_core import find_routes, find_critical_points, split_critical_paths, assign_waiting_agents, replan_waiting_agents
-
+from planner.planner_core import (
+    find_routes, find_critical_points, split_critical_paths,
+    assign_waiting_agents, replan_waiting_agents
+)
 from planner.visualiser import animate_paths
 from utils import load_map, build_graph_from_yaml, get_occupied_nodes, generate_filtered_map
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Multi-Robot Fragment Planner")
     parser.add_argument('--map', type=str, default='data/map.yaml', help='Path to YAML map file')
-    parser.add_argument('--save', action='store_true', help='Save animation as video')
+    parser.add_argument('--save', action='store_true', help='Save animation to file')
     return parser.parse_args()
-
-
 
 def create_agents() -> list:
     return [
         Agent("Robot1", "Park1", "T01"),
         Agent("Robot2", "Park2", "T52"),
         Agent("Robot3", "Park3", "T00"),
-        Agent("Robot4", "Spare2", "T51"),
+        # Agent("Robot4", "Spare2", "T51"),
     ]
 
-
 def main():
+    reservation_table = {}
+    edge_reservations = {}
+
     args = parse_args()
     print("[✓] Loading map...")
     map_data = load_map(args.map)
@@ -38,53 +39,50 @@ def main():
 
     print("[✓] Identifying occupied nodes...")
     occupied = get_occupied_nodes(agents, graph)
+    print("\n==== Occupied Nodes for Filtering ====")
+    print(occupied)
 
     print("[✓] Filtering map and replanning if needed...")
-    for agent in agents:
+    for i, agent in enumerate(agents):
         if agent.active:
+            prev_agents = agents[:i]
+            occupied = get_occupied_nodes(prev_agents, graph)
+            print(f"[{agent.name}] Occupied nodes (from previous agents): {occupied}")
             filtered = generate_filtered_map(graph, occupied, agent.start, agent.goal)
-            find_routes([agent], filtered)
+
+            try:
+                find_routes([agent], filtered)
+                agent.original_path_length = len(agent.full_route)
+            except Exception as e:
+                print(f"[!] {agent.name} could not plan with filtered map. Scheduling wait and retrying with full map...")
+                wait_time = 3.0
+                agent.start_delay = agent.arrival_time + wait_time if hasattr(agent, "arrival_time") else wait_time
+                find_routes([agent], graph)
+                agent.original_path_length = len(agent.full_route)
 
     print("[✓] Detecting critical points...")
     criticals = find_critical_points(agents)
 
     print("[✓] Splitting paths at critical points...")
-    for agent in agents:
-        route = agent.route
-        if not route or not agent.active:
-            continue
-
-        fragments = []
-        fragment = []
-        for i, node in enumerate(route):
-            fragment.append(node)
-            if node in criticals:
-                if not any(a.name != agent.name and node in a.route and a.priority() < agent.priority() for a in agents):
-                    continue
-                else:
-                    agent.waiting = True
-                    if i > 0:
-                        agent.wait_node = route[i - 1]
-                    fragments.append(fragment[:-1])
-                    fragment = [node]
-        if fragment:
-            fragments.append(fragment)
-        agent.fragments = fragments
-        agent.route = fragments[0] if fragments else []
+    split_critical_paths(graph, agents, list(criticals.keys()))
 
     print("[✓] Resolving waiting agents...")
-    any_waiting = True
-    while any_waiting:
-        before = {a.name for a in agents if a.waiting}
-        assign_waiting_agents(agents)
-        after = {a.name for a in agents if a.waiting}
-        new_waiters = after - before
-        any_waiting = bool(new_waiters)
+    assign_waiting_agents(agents)
 
-    print("==== Final Agent Routes ====")
+    print("\n==== Final Agent Routes and Timings ====")
     for agent in agents:
         status = "Active" if agent.goal else "Inactive (No goal)"
-        print(f"- {agent.name}: route={agent.route} | full_route={agent.full_route} | fragments={agent.fragments} | {status}")
+        print(f"\nAgent: {agent.name} ({status})")
+        print(f"  Fragments: {agent.fragments}")
+        if not agent.route:
+            print("  No route assigned.")
+            continue
+        for u, v, depart, arrive in agent.route:
+            print(f"  {u} → {v}: depart at {depart:.2f}, arrive at {arrive:.2f}")
+        print(f"  Final full route: {agent.full_route}")
+        print(f"  Final arrival time: {agent.arrival_time:.2f}")
+        if agent.waiting:
+            print(f"  Wait Node: {agent.wait_node}, Arrival Time: {agent.arrival_time:.2f}, Resume Time: {agent.resume_time:.2f}")
 
     print("[✓] Launching animation...")
     positions = {node: tuple(data['pos']) for node, data in graph.nodes(data=True)}
@@ -97,13 +95,15 @@ def main():
                 return math.atan2(2.0 * w * z, 1.0 - 2.0 * (z ** 2))
         return None
 
-    # Pass graph to visualiser for dynamic replanning during animation
-    replan_waiting_agents(agents, graph, frame=0)
-
-
-    animate_paths(agents, positions, map_data, get_orientation_from_map, show_legend=True, graph=graph, save=args.save)
-
+    animate_paths(
+        agents=agents,
+        positions=positions,
+        topo_map=map_data,
+        get_orientation_from_map=get_orientation_from_map,
+        show_legend=True,
+        graph=graph,
+        save=args.save
+    )
 
 if __name__ == "__main__":
-    import math
     main()
