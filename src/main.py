@@ -1,7 +1,7 @@
 import argparse
 import math
 from planner.agent import Agent
-from planner.planner_core import find_routes
+from planner.time_aware_planner import find_routes
 from planner.visualiser import animate_paths
 from utils import load_map, build_graph_from_yaml
 

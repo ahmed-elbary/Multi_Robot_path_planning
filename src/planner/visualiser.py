@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import FancyArrowPatch
 import math
-from planner.planner_core import replan_waiting_agents
+from planner.time_aware_planner import replan_waiting_agents
 
 def animate_paths(agents, positions, topo_map, get_orientation_from_map, fps=10, wait_time=3.0, show_legend=False, graph=None, save=False):
     fig, ax = plt.subplots(figsize=(10, 7))
