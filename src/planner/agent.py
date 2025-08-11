@@ -1,4 +1,5 @@
-from typing import List
+# --- add near top of file ---
+from typing import List, Optional
 
 class Agent:
     def __init__(self, name: str, start: str, goal: str):
@@ -10,7 +11,7 @@ class Agent:
         self.fragments: List[List[str]] = []
         self.active: bool = True
         self.waiting: bool = False
-        self.wait_node: str = None
+        self.wait_node: Optional[str] = None
         self.finished: bool = False
         self.replanned: bool = False
         self.dynamic_coords = []
@@ -21,6 +22,11 @@ class Agent:
         self.resume_time: float = 0.0
         self.current_fragment_idx = 0
         self.current_node = self.start
+
+        # --- NEW: critical-point signaling / ownership ---
+        self.blocked_by_node: Optional[str] = None   # collision node (critical point) we're waiting on
+        self.blocker_owner: Optional[str] = None     # agent name that owns the node by priority
+        self.resume_ready: bool = False              # set True when blocker has passed critical node
 
     def priority(self) -> int:
         return int(self.name.replace("Robot", ""))
