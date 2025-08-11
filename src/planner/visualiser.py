@@ -1,10 +1,9 @@
 # planner/visualiser.py
-import math, os
+import math
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import FancyArrowPatch
 
-# Use the new planner with frame/positions-based replan
 try:
     from .fragment_planner import replan_waiting_agents
 except ImportError:
@@ -72,7 +71,7 @@ def animate_paths(
         while len(angles) < len(coords):
             angles.append(final_angle)
         agent.dynamic_coords, agent.dynamic_angles = coords, angles
-    
+
     def rebuild_from_node_list(agent, node_path, positions, get_orientation_from_map, fps=10):
         if not node_path or len(node_path) < 2:
             agent.dynamic_coords = [positions[node_path[0]]] if node_path else []
@@ -94,8 +93,7 @@ def animate_paths(
             angles.append(final_angle)
         agent.dynamic_coords, agent.dynamic_angles = coords, angles
 
-
-    # initial trails (dash intended routes)
+    # --- initial trails (dash intended routes)
     for idx, agent in enumerate(agents):
         if agent.start in positions:
             sx, sy = positions[agent.start]
@@ -118,19 +116,16 @@ def animate_paths(
         # and animate only the last fragment of the movers.
         if _second_run and freeze_agents_not_in is not None:
             if agents[idx].name not in freeze_agents_not_in:
-                # Freeze at goal: show a single frame at final position
                 if agents[idx].full_route:
                     goal_node = agents[idx].full_route[-1]
                     agent.dynamic_coords = [positions[goal_node]]
                     agent.dynamic_angles = [get_orientation_from_map(goal_node) or 0.0]
             else:
-                # Animate only the last fragment (the resumed bit), not the whole path
                 last_frag = agents[idx].fragments[-1] if getattr(agents[idx], "fragments", None) else None
                 if last_frag:
                     node_path = [last_frag[0][0]] + [v for (_, v) in last_frag]
                     rebuild_from_node_list(agents[idx], node_path, positions, get_orientation_from_map, fps=fps)
                 else:
-                    # fallback: animate from wait_node to goal if present
                     if getattr(agent, "wait_node", None) and agent.full_route:
                         try:
                             start_idx = agent.full_route.index(agent.wait_node)
@@ -139,58 +134,28 @@ def animate_paths(
                         except ValueError:
                             pass
 
-
         dot, = ax.plot([], [], marker="o", linestyle="None",
-               markerfacecolor=colors[idx % len(colors)],
-               markeredgecolor="k", markersize=12, zorder=6)
+                       markerfacecolor=colors[idx % len(colors)],
+                       markeredgecolor="k", markersize=12, zorder=6)
         trails.append({"coords": agent.dynamic_coords,
                        "angles": agent.dynamic_angles,
                        "dot": dot, "arrow": None,
                        "color": colors[idx % len(colors)], "agent": agent})
         max_frames = max(max_frames, len(agent.dynamic_coords))
 
-    # Debug: how many frames each agent has initially
     for t in trails:
         print(f"[Viz:init] {t['agent'].name} dynamic frames: {len(t['coords'])}")
     agent_to_trail = {t["agent"]: t for t in trails}
     second_window_spawned = False  # prevent endless spawns
 
-
-    trigger_agent_name = "Robot1"  # the agent whose arrival triggers the replan
-    replan_banner_printed = False  # "[→] Replan loop 1..."
-    replan_success_printed = False # "[✓] One or more waiting agents..."
-
-
-
-    
-
-    def make_after_animation_summary(agents):
-        lines = ["==== After Animation ====", ""]
-        for a in agents:
-            flags = []
-            if getattr(a, "active", True): flags.append("active")
-            if getattr(a, "finished", False): flags.append("finished")
-            if getattr(a, "replanned", False): flags.append("replanned")
-            status = ", ".join(flags) if flags else "idle"
-            frag = None
-            if getattr(a, "fragments", None):
-                for f in a.fragments:
-                    if f:
-                        frag = f; break
-            if not frag:
-                frag = a.route if a.route else [a.start]
-            lines.append(f"Agent: {a.name} [{status}]")
-            lines.append("  Fragment: " + " -> ".join([frag[0][0]] + [v for _, v in frag]) if frag and isinstance(frag[0], tuple)
-                         else "  Fragment: " + " -> ".join(frag))
-            full = getattr(a, "full_route", []) or [a.start]
-            lines.append(f"  Full route: {full}")
-            lines.append("")
-        return "\n".join(lines)
+    trigger_agent_name = "Robot1"
+    replan_banner_printed = False
+    replan_success_printed = False
 
     def update(frame):
         nonlocal replan_banner_printed, replan_success_printed, second_window_spawned
         artists = []
-        # --- draw agents
+        # draw agents
         for trail in trails:
             if not trail["coords"]:
                 continue
@@ -203,12 +168,12 @@ def animate_paths(
             if trail["arrow"]:
                 trail["arrow"].remove()
             trail["arrow"] = FancyArrowPatch((x, y), (x + dx, y + dy),
-                                            arrowstyle="-|>", mutation_scale=20,
-                                            color=trail["color"])
+                                             arrowstyle="-|>", mutation_scale=20,
+                                             color=trail["color"])
             ax.add_patch(trail["arrow"])
             artists.extend([trail["dot"], trail["arrow"]])
 
-        # --- detect when Robot1 (trigger) reaches end of its animated path
+        # trigger on Robot1 reaching end of its path
         trig = next((a for a in agents if a.name == trigger_agent_name), None)
         at_end = False
         if trig:
@@ -218,7 +183,7 @@ def animate_paths(
                 if at_end:
                     trig.finished = True
 
-        # --- Replan ONCE and print the three lines you want (during animation)
+        # replan once
         if graph and at_end and not replan_success_printed:
             if not replan_banner_printed:
                 print("\n[→] Replan loop 1: attempting to resume all waiting agents...")
@@ -227,47 +192,38 @@ def animate_paths(
             resumed = replan_waiting_agents(
                 agents, graph,
                 frame=frame,
-                positions=positions,                    # <-- IMPORTANT
-                release_delay_frames=int(wait_time*fps) # small buffer
+                positions=positions,
+                release_delay_frames=int(wait_time * fps)
             )
 
             if resumed:
-                # capture movers BEFORE clearing the flag
                 movers = [a.name for a in agents if getattr(a, "replanned", False)]
-
-                # print per-agent resumed line (no rebuild here; keep first window “as-is”)
                 for a in agents:
                     if getattr(a, "replanned", False):
                         print(f"[Replan] {a.name} resumed: {a.full_route}")
-
                 print("[✓] One or more waiting agents successfully replanned.")
                 replan_success_printed = True
 
-                # keep first window open; spawn ONE second window where only movers animate
                 if not _second_run and not second_window_spawned:
                     second_window_spawned = True
                     tm = fig.canvas.new_timer(interval=400)
-                    tm.single_shot = True           # <-- important: fire once
+                    tm.single_shot = True
                     def _spawn_second():
-                        # clear replanned flags now that we've captured movers
                         for a in agents:
                             if getattr(a, "replanned", False):
                                 a.replanned = False
                         animate_paths(
                             agents, positions, topo_map, get_orientation_from_map,
                             fps=fps, wait_time=wait_time, show_legend=show_legend,
-                            graph=None,                         # <-- optional: disable replan in 2nd window
+                            graph=None,  # disable replan in 2nd window
                             save=save, _second_run=True,
                             freeze_agents_not_in=set(movers),
                         )
                     tm.add_callback(_spawn_second)
                     tm.start()
-                    fig._spawn_timer = tm            # <-- keep a strong reference
+                    fig._spawn_timer = tm
 
-
-
-                    return artists
-
+        return artists
 
     if show_legend:
         from matplotlib.lines import Line2D
@@ -283,7 +239,6 @@ def animate_paths(
         for t in trails:
             t["dot"].set_data([], [])
             if t["arrow"]:
-                t["arrow"].remove()
                 t["arrow"] = None
             artists.append(t["dot"])
         return artists
@@ -291,10 +246,11 @@ def animate_paths(
     ani = animation.FuncAnimation(
         fig, update, frames=max_frames if max_frames > 0 else 1,
         interval=100, blit=False, repeat=False, init_func=init,
-    ) 
-    fig.ani = ani
+    )
+    fig.ani = ani  # keep a strong ref
 
     if save:
+        import os
         os.makedirs("output", exist_ok=True)
         ani.save("output/animation.gif", writer="pillow", fps=fps)
         print("[✓] Animation saved to output/animation.gif")
