@@ -5,7 +5,6 @@ from planner.fragment_planner import (
     find_routes,
     find_critical_points,
     split_critical_paths,
-    assign_waiting_agents,
     replan_waiting_agents,
 )
 from utils import load_map, build_graph_from_yaml
@@ -14,7 +13,7 @@ from planner.visualiser import animate_paths
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Multi-Robot Fragment-Based Path Planner")
-    parser.add_argument('--map', type=str, default='data/map3.yaml', help='Path to YAML map file')
+    parser.add_argument('--map', type=str, default='data/map.yaml', help='Path to YAML map file')
     parser.add_argument('--max_loops', type=int, default=5, help='Max replan loops per cascade')
     parser.add_argument('--animate', action='store_true', help='Show matplotlib animation')
     parser.add_argument('--fps', type=int, default=10, help='Animation FPS')
@@ -24,13 +23,13 @@ def parse_args():
 
 
 
-# def create_agents() -> list:
-#     return [
-#         Agent("Robot1", "Park1", "Spare1"),
-#         Agent("Robot2", "Park2", "T50"),
-#         Agent("Robot3", "Park3", "T52"),
-#         Agent("Robot4", "Spare1", "T21"),
-#     ]
+def create_agents() -> list:
+    return [
+        Agent("Robot1", "Park1", "Spare1"),
+        Agent("Robot2", "Park2", "T50"),
+        Agent("Robot3", "Park3", "T52"),
+        Agent("Robot4", "Spare1", "T21"),
+    ]
 
 # def create_agents() -> list:
 #     return [
@@ -41,14 +40,14 @@ def parse_args():
 #         Agent("Robot5", "Park5", "B1"),
 #     ]
 
-def create_agents() -> list:
-    return [
-        Agent("Robot1", "Park1", "W"),
-        Agent("Robot2", "Park2", "S"),
-        Agent("Robot3", "Park3", "N"),
-        Agent("Robot4", "Park4", "E"),
-        Agent("Robot5", "Park5", "NE"),
-    ]
+# def create_agents() -> list:
+#     return [
+#         Agent("Robot1", "Park1", "W"),
+#         Agent("Robot2", "Park2", "S"),
+#         Agent("Robot3", "Park3", "N"),
+#         Agent("Robot4", "Park4", "E"),
+#         Agent("Robot5", "Park5", "NE"),
+#     ]
 
 def pretty_frag(frag):
     return " -> ".join([frag[0][0]] + [v for (_, v) in frag]) if frag else ""

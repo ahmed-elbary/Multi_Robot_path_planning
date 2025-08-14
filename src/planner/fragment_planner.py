@@ -1,8 +1,19 @@
 # fragment_planner.py
-import networkx as nx
-from typing import List, Dict, Tuple, Optional
-from .agent import Agent
 import math
+from typing import List, Dict, Tuple, Optional
+import networkx as nx
+from .agent import Agent
+
+
+# ------------------------------- helpers -------------------------------
+
+def _fmt_path(p: Optional[List[str]], limit: int = 18) -> str:
+    """Pretty-print a node list with optional truncation."""
+    if not p:
+        return "<no path>"
+    if limit is None or len(p) <= limit:
+        return " -> ".join(p)
+    return " -> ".join(p[:limit]) + " -> ..."
 
 
 def _node_claims(agents: List[Agent]) -> Dict[str, List[Agent]]:
@@ -14,6 +25,7 @@ def _node_claims(agents: List[Agent]) -> Dict[str, List[Agent]]:
                 claims.setdefault(n, []).append(a)
     return claims
 
+
 def _compute_block_constraints(agents: List[Agent], graph: nx.Graph) -> Dict[str, List[Tuple[str, str]]]:
     """
     For each agent, compute list of (node, owner_name) it must yield at,
@@ -24,7 +36,6 @@ def _compute_block_constraints(agents: List[Agent], graph: nx.Graph) -> Dict[str
     for node, claimers in claims.items():
         if len(claimers) < 2:
             continue
-        # decide the winner at this node
         winner = agent_has_priority(claimers, node, graph)
         if not winner:
             continue
@@ -33,6 +44,7 @@ def _compute_block_constraints(agents: List[Agent], graph: nx.Graph) -> Dict[str
                 continue
             constraints.setdefault(a.name, []).append((node, winner.name))
     return constraints
+
 
 def _earliest_block_on_path(path: List[str], blocks: List[Tuple[str, str]]) -> Optional[Tuple[int, str, str]]:
     """
@@ -46,6 +58,29 @@ def _earliest_block_on_path(path: List[str], blocks: List[Tuple[str, str]]) -> O
         if n in node_to_owner:
             return (idx, n, node_to_owner[n])
     return None
+
+
+def _distance_to_node_in_route(agent: Agent, node: str, graph: nx.Graph) -> float:
+    if not agent.full_route or node not in agent.full_route:
+        return math.inf
+    idx = agent.full_route.index(node)
+    dist = 0.0
+    for i in range(idx):
+        u, v = agent.full_route[i], agent.full_route[i + 1]
+        dist += float(graph[u][v].get("weight", 1.0))
+    return dist
+
+
+def agent_has_priority(agents: List[Agent], node: str, graph: nx.Graph) -> Optional[Agent]:
+    claimers = [a for a in agents if a.full_route and node in a.full_route]
+    if not claimers:
+        return None
+    scored = [(_distance_to_node_in_route(a, node, graph), a.priority(), a) for a in claimers]
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return scored[0][2]
+
+
+# ------------------------------- initial planning -------------------------------
 
 def find_routes(agents: List[Agent], graph: nx.Graph):
     """
@@ -69,7 +104,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
 
         try:
             path = nx.shortest_path(filtered, agent.start, agent.goal)
-            agent.route = [(path[j], path[j+1]) for j in range(len(path)-1)]
+            agent.route = [(path[j], path[j + 1]) for j in range(len(path) - 1)]
             agent.full_route = path
             agent.fragments = [agent.route]
             agent.waiting = False
@@ -86,78 +121,85 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
             agent.wait_node = agent.start
             print(f"[{agent.name}] No spatial path due to blocked nodes, will wait at {agent.start}")
 
+
 def find_critical_points(agents: List[Agent]) -> Dict[str, List[str]]:
-    """
-    Return all critical nodes shared by more than one agent on their route.
-    """
+    """Return all critical nodes shared by more than one agent on their route."""
     node_claims: Dict[str, List[str]] = {}
     for agent in agents:
         for _, v in agent.route:
             node_claims.setdefault(v, []).append(agent.name)
     return {n: names for n, names in node_claims.items() if len(names) > 1}
 
-def _distance_to_node_in_route(agent: Agent, node: str, graph: nx.Graph) -> float:
-    if not agent.full_route or node not in agent.full_route:
-        return math.inf
-    idx = agent.full_route.index(node)
-    dist = 0.0
-    for i in range(idx):
-        u, v = agent.full_route[i], agent.full_route[i+1]
-        dist += float(graph[u][v].get('weight', 1.0))
-    return dist
 
-def agent_has_priority(agents: List[Agent], node: str, graph: nx.Graph) -> Optional[Agent]:
-    claimers = [a for a in agents if a.full_route and node in a.full_route]
-    if not claimers:
-        return None
-    scored = [( _distance_to_node_in_route(a, node, graph), a.priority(), a) for a in claimers]
-    scored.sort(key=lambda t: (t[0], t[1]))
-    return scored[0][2]
+# ------------------------------- initial safe split -------------------------------
 
 def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points: List[str]):
     """
-    Multi-robot split: compute all critical ownerships, then for each agent
-    cut its route to the earliest blocked node and mark it waiting there.
+    Compute initial safe fragments and mark waiters.
+
+    - For each agent, find the earliest blocked node along its full_route using
+      nearest-wins ownership (_compute_block_constraints + _earliest_block_on_path).
+    - Keep only the safe prefix up to the predecessor of that blocked node.
+    - If no block applies, keep the full first fragment produced by find_routes.
+    - Print a one-line summary showing the fragment end (safepoint).
     """
-    # Build full constraint sets across all nodes/agents
     all_constraints = _compute_block_constraints(agents, graph)
 
     for agent in agents:
-        # full_route might be just [start] for waiting agents
+        # No usable route yet
         if not getattr(agent, "full_route", None) or len(agent.full_route) < 2:
+            if getattr(agent, "full_route", None):
+                agent.fragment_end_node = agent.full_route[-1]
+                print(f"[Fragment:init] {agent.name} → fragment end = {agent.fragment_end_node} "
+                      f"(seg: {_fmt_path(agent.full_route)})")
             continue
 
         blocks = all_constraints.get(agent.name, [])
+
+        # No constraints → keep full first fragment (what find_routes produced)
         if not blocks:
-            # no constraints → can keep full route (first fragment is full)
             agent.waiting = False
             agent.wait_node = None
             agent.blocked_by_node = None
             agent.blocker_owner = None
             agent.blocked_constraints = []
             # ensure first fragment exists
-            agent.fragments = [agent.route] if getattr(agent, "route", None) else agent.fragments
+            if getattr(agent, "route", None):
+                agent.fragments = [agent.route]
+                seg_nodes = [agent.route[0][0]] + [v for (_, v) in agent.route]
+            else:
+                seg_nodes = agent.full_route
+            agent.fragment_end_node = seg_nodes[-1]
+            print(f"[Fragment:init] {agent.name} → fragment end = {agent.fragment_end_node} "
+                  f"(seg: {_fmt_path(seg_nodes)})")
             continue
 
-        # find earliest blocked node along the *current* full route
+        # Find earliest blocked node along the current full route
         eb = _earliest_block_on_path(agent.full_route, blocks)
+
+        # Constraints exist but not on the current remaining path → proceed unchanged
         if not eb:
-            # constraints exist but not on the current remaining path (rare) → proceed
             agent.waiting = False
             agent.wait_node = None
             agent.blocked_by_node = None
             agent.blocker_owner = None
-            agent.blocked_constraints = blocks  # keep for future
+            agent.blocked_constraints = blocks
+            if getattr(agent, "route", None):
+                seg_nodes = [agent.route[0][0]] + [v for (_, v) in agent.route]
+            else:
+                seg_nodes = agent.full_route
+            agent.fragment_end_node = seg_nodes[-1]
+            print(f"[Fragment:init] {agent.name} → fragment end = {agent.fragment_end_node} "
+                  f"(seg: {_fmt_path(seg_nodes)})")
             continue
 
         cut_idx, blocked_node, owner = eb
-        # last safe node is the predecessor of the blocked node
-        last_safe = agent.full_route[cut_idx-1]
+        last_safe = agent.full_route[cut_idx - 1]  # predecessor of the blocked node
 
         # Build new fragment from start -> last_safe (edges)
         new_frag: List[Tuple[str, str]] = []
-        for i in range(cut_idx-1):
-            u, v = agent.full_route[i], agent.full_route[i+1]
+        for i in range(cut_idx - 1):
+            u, v = agent.full_route[i], agent.full_route[i + 1]
             new_frag.append((u, v))
 
         # Replace fragments/route/full_route to the safe prefix
@@ -165,41 +207,65 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
         agent.route = new_frag
         agent.full_route = [agent.start] + [v for (u, v) in new_frag] if new_frag else [agent.start]
 
-        # Mark waiting at last_safe and store constraints (all of them)
+        # Mark waiting at last_safe and store constraints
         agent.waiting = True
         agent.wait_node = last_safe
-        agent.blocked_by_node = blocked_node           # for backward compat / logs
+        agent.blocked_by_node = blocked_node
         agent.blocker_owner = owner
-        agent.blocked_constraints = blocks             # NEW: keep all blockers
+        agent.blocked_constraints = blocks
         agent.resume_ready = False
 
-        print(f"[{agent.name}] Wait at {last_safe} due to collision at {blocked_node} (blocked by {owner})")
+        # Log the safe fragment we’re taking now
+        seg_nodes = [agent.start] + [v for (_, v) in new_frag] if new_frag else [agent.start]
+        agent.fragment_end_node = seg_nodes[-1]
+        print(f"[Fragment:init] {agent.name} → fragment end = {agent.fragment_end_node} "
+              f"(seg: {_fmt_path(seg_nodes)}) | blocked ahead at {blocked_node} by {owner}")
 
-def assign_waiting_agents(agents):  # optional extension; currently handled in split
-    pass
+
+# ------------------------------- incremental replanning -------------------------------
 
 def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> bool:
     """
-    NO-PARTIALS release with blocker-aware gating.
+    Fragment-to-next-safe policy with verbose, deduped logging.
 
-    Strict policy (default): a waiter may be released only if there exists a full,
-    currently-free path to its goal AND every owner whose route claims any node
-    on that path is FINISHED (owner-level gate).
+    For each waiting agent:
+      1) Build a filtered shortest path (what is free *now*).
+      2) Cut at the first currently-owned node → release only the safe prefix
+         (source .. last-safe-before-critical). If none, FULL→goal.
+      3) If prefixes still conflict, release ONE global winner and gate others
+         behind the winner at the first shared node.
     """
     frame = kwargs.get("frame", 0)
     positions = kwargs.get("positions", {})
     release_delay_frames = int(kwargs.get("release_delay_frames", 0))
     reach_tol = float(kwargs.get("reach_tol", 0.20))
-    finished_owners = set(kwargs.get("finished_owners", set()))
-    strict_owner_gate = bool(kwargs.get("strict_owner_gate", True))
-    start_frames = kwargs.get("start_frames", {})  # optional; ok if missing
+    start_frames = kwargs.get("start_frames", {})  # {agent_name: animation start frame}
+    verbose_snapshots = bool(kwargs.get("verbose_snapshots", True))
+
+    # -------- helpers (logging + geometry) --------
+    def _print_safepoints_snapshot():
+        print("\n--- Safepoints snapshot ---")
+        for a in agents:
+            state = (
+                "finished" if getattr(a, "finished", False)
+                else ("waiting" if getattr(a, "waiting", False) else "active")
+            )
+            frag_end = getattr(a, "fragment_end_node", None)
+            safepoint = frag_end or getattr(a, "wait_node", None) or "-"
+            blocker = getattr(a, "blocker_owner", None)
+            block_node = getattr(a, "blocked_by_node", None)
+            block_txt = f"{blocker}@{block_node}" if (blocker and block_node) else "-"
+            route_head = getattr(a, "full_route", []) or []
+            print(f"  [{a.name}] {state:8s} | safe_until={safepoint:>6} | "
+                  f"block={block_txt:>12} | goal={getattr(a, 'goal', None)} | "
+                  f"route={_fmt_path(route_head, 12)}")
+        print("—" * 48)
 
     def _log_gate(agent: Agent, owner_name: str, gate_node: str):
-        # print only if gate changed (debounce spam)
+        # print only if gate changed (dedup noisy logs)
         key = (owner_name, gate_node)
-        prev = getattr(agent, "_gate_state", None)
-        if prev != key:
-            print(f"[i] {agent.name} strictly gated by {owner_name} at {gate_node}")
+        if getattr(agent, "_gate_state", None) != key:
+            print(f"[i] {agent.name} gated by {owner_name} at {gate_node}")
             agent._gate_state = key
 
     def first_frame_at_node(blocker: Agent, node: str) -> Optional[int]:
@@ -213,42 +279,58 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         tol2 = reach_tol * reach_tol
         for i, (x, y) in enumerate(blocker.dynamic_coords):
             dx, dy = x - tx, y - ty
-            if dx*dx + dy*dy <= tol2:
+            if dx * dx + dy * dy <= tol2:
                 blocker._node_frame_cache[node] = i
                 return i
         return None
 
     def has_reached_node(agent: Agent, node: str) -> bool:
-        # terminal runs: finished agents count as having reached nodes on their route
-        if getattr(agent, "finished", False):
-            fr = getattr(agent, "full_route", []) or []
-            return node in fr
-        # animation runs: compare against *local* time since this path started (optional)
-        local_start = int(start_frames.get(agent.name, 0)) if start_frames else 0
+        # Compare against local time since this agent's current animation path started
+        local_start = int(start_frames.get(agent.name, 0))
         local_frame = frame - local_start
         if local_frame < 0:
             return False
         f = first_frame_at_node(agent, node)
         return f is not None and local_frame >= f + release_delay_frames
+    
 
-    def _distance_to_node_in_route(agent: Agent, node: str, G: nx.Graph) -> float:
-        if not agent.full_route or node not in agent.full_route:
+    def owner_has_cleared(owner: Agent, node: str) -> bool:
+        """
+        A contested node becomes free only after the owner has moved *past* it:
+        - If node is the owner's GOAL: require 'finished' (goal stays occupied).
+        - Otherwise: require the owner to have reached the *next* node after 'node'.
+        """
+        if node == getattr(owner, "goal", None):
+            return getattr(owner, "finished", False)
+
+        fr = getattr(owner, "full_route", None) or []
+        if node in fr:
+            i = fr.index(node)
+            if i + 1 < len(fr):
+                next_node = fr[i + 1]
+                return has_reached_node(owner, next_node)
+
+        # If we don't find the node in the route (shouldn't happen), be conservative.
+        return False
+
+
+    def _dist_in_path(path: List[str], node: str) -> float:
+        if node not in path:
             return math.inf
-        idx = agent.full_route.index(node)
-        dist = 0.0
-        for i in range(idx):
-            u, v = agent.full_route[i], agent.full_route[i+1]
-            dist += float(G[u][v].get("weight", 1.0))
-        return dist
+        d = 0.0
+        for i in range(path.index(node)):
+            u, v = path[i], path[i + 1]
+            d += float(graph[u][v].get("weight", 1.0))
+        return d
 
     by_name = {a.name: a for a in agents}
 
-    # ---- who is waiting this round?
+    # -------- who is waiting now --------
     waiters: List[Agent] = [a for a in agents if getattr(a, "waiting", False) and not getattr(a, "replanned", False)]
     if not waiters:
         return False
 
-    # ---- active claims: moving owners claim their future nodes; finished owners only their GOAL
+    # -------- active owners (claim nodes) --------
     active_claims: Dict[str, List[Agent]] = {}
     for a in agents:
         if a in waiters:
@@ -262,192 +344,199 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 for n in a.full_route[1:]:
                     active_claims.setdefault(n, []).append(a)
 
-    def blocked_by_active(node: str) -> Optional[Agent]:
+    def owner_blocking(node: str) -> Optional[Agent]:
         owners = active_claims.get(node, [])
         if not owners:
             return None
-        owner = min(owners, key=lambda a: (_distance_to_node_in_route(a, node, graph), a.priority()))
-        owner_at_node = has_reached_node(owner, node)
-        # Goal: free until arrival; after arrival stays blocked (parking)
-        if node == getattr(owner, "goal", None):
-            return owner if owner_at_node else None
-        # Non-goal: blocked until the owner reaches it; then it frees
-        return owner if not owner_at_node else None
+        # nearest owner to node; tiebreak by agent priority
+        return min(owners, key=lambda o: (_dist_in_path(getattr(o, "full_route", []) or [], node), o.priority()))
 
-    # ---- losers gated behind a specific blocker until that blocker reaches its gate node
-    gated: List[Agent] = []
+    # -------- build filtered shortest paths (free *now*) --------
+    full_candidates: Dict[str, List[str]] = {}
     for a in waiters:
-        owner_name = getattr(a, "blocker_owner", None)
-        gate_node = getattr(a, "blocked_by_node", None)
-        if not owner_name or not gate_node:
-            continue
-        owner = by_name.get(owner_name)
-        if not owner:
-            continue
-        if gate_node == getattr(owner, "goal", None):
-            if (owner.name not in finished_owners) and (not has_reached_node(owner, owner.goal)):
-                gated.append(a)
-                _log_gate(a, owner.name, gate_node)
-        else:
-            if not has_reached_node(owner, gate_node):
-                gated.append(a)
-                _log_gate(a, owner.name, gate_node)
-
-    # ---- Step 1: build candidate FULL paths for not-gated waiters only (free *now*)
-    candidate_paths: Dict[str, List[str]] = {}
-    for a in waiters:
-        if a in gated or not getattr(a, "wait_node", None):
-            continue
+        if getattr(a, "_gate_state", None) is not None:
+            a._gate_state = None  # clear dedup once condition may have changed
 
         Gf = graph.copy()
 
-        # Finished owners' goals are hard obstacles, except if it's my goal or my source
+        # Finished owners' goals are hard obstacles (except my goal & my source)
         finished_goals = {b.goal for b in agents if b is not a and getattr(b, "finished", False)}
         for g in list(finished_goals):
-            if g != a.goal and g != a.wait_node and g in Gf:
+            if g != getattr(a, "goal", None) and g != getattr(a, "wait_node", None) and g in Gf:
                 Gf.remove_node(g)
 
-        # Remove every node currently blocked by an ACTIVE owner (keep my source)
+        # Remove nodes currently blocked by ACTIVE owners (keep my source)
         to_remove = []
         for n in list(Gf.nodes):
-            if n == a.wait_node:
+            if n == getattr(a, "wait_node", None):
                 continue
-            if blocked_by_active(n) is not None:
+            owner = owner_blocking(n)
+            if owner is not None and not owner_has_cleared(owner, n):
                 to_remove.append(n)
         for n in to_remove:
             if n in Gf:
                 Gf.remove_node(n)
 
         try:
-            if a.wait_node not in Gf or a.goal not in Gf:
+            src = getattr(a, "wait_node", None)
+            dst = getattr(a, "goal", None)
+            if src not in Gf or dst not in Gf:
                 raise nx.NodeNotFound
-            p = nx.shortest_path(Gf, a.wait_node, a.goal)
-            candidate_paths[a.name] = p
+            p = nx.shortest_path(Gf, src, dst)
+            full_candidates[a.name] = p
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             pass
 
-    if not candidate_paths:
-        # clear gate spam only for agents that truly have no gate this round
+    # Log: candidates
+    print("\n[Replan] Candidates (filtered shortest paths):")
+    for a in waiters:
+        print(f"  - {a.name}: {_fmt_path(full_candidates.get(a.name))}")
+
+    if verbose_snapshots:
+        print("\n[Replan] Candidates (filtered shortest paths):")
         for a in waiters:
-            if a not in gated and getattr(a, "_gate_state", None) is not None:
-                a._gate_state = None
+            print(f"  - {a.name}: {_fmt_path(full_candidates.get(a.name))}")
+
+
+    # -------- cut each candidate to SAFE PREFIX (until first currently-owned node) --------
+    safe_segments: Dict[str, List[str]] = {}
+    gate_hint: Dict[str, Tuple[str, str]] = {}  # name -> (owner_name, gate_node)
+
+    for name, path in full_candidates.items():
+        block_index = None
+        blocker_owner = None
+        for idx, n in enumerate(path[1:], start=1):
+            owner = owner_blocking(n)
+            if owner is not None and not owner_has_cleared(owner, n):
+                block_index = idx
+                blocker_owner = owner
+                break
+
+
+        if block_index is None:
+            safe_segments[name] = path  # FULL→goal
+        else:
+            if block_index - 1 >= 0:
+                safe_segments[name] = path[:block_index]        # up to predecessor (safe)
+                gate_hint[name] = (blocker_owner.name, path[block_index])  # wait until owner reaches this node
+
+    # Log: safe segments / gates
+    if verbose_snapshots:
+        print("[Replan] Safe segments (to next safepoint):")
+        for a in waiters:
+            if a.name in safe_segments:
+                seg = safe_segments[a.name]
+                end = seg[-1]
+                suffix = "  [FULL→goal]" if end == getattr(a, "goal", None) else ""
+                print(f"  - {a.name}: {_fmt_path(seg)}  (end={end}){suffix}")
+            else:
+                if a.name in gate_hint:
+                    owner, node = gate_hint[a.name]
+                    print(f"  - {a.name}: GATED by {owner} at {node} (hold at {getattr(a,'wait_node',None)})")
+                else:
+                    print(f"  - {a.name}: <no safe prefix now>")
+
+
+    if not safe_segments:
+        # Everyone blocked immediately: log dedup gate info if we have it
+        for name, hint in gate_hint.items():
+            ag = by_name[name]
+            _log_gate(ag, hint[0], hint[1])
+        _print_safepoints_snapshot()
         return False
 
-    # ---- Step 2: STRICT OWNER GATE (only release if ALL owners on the path are finished)
-    gated_any = {a.name for a in gated}  # accumulate all gated this round (any rule)
-    if strict_owner_gate:
-        filtered: Dict[str, List[str]] = {}
-        for name, p in candidate_paths.items():
-            unfinished_owners_on_path = set()
-            for n in p[1:]:
-                for o in active_claims.get(n, []):
-                    if not getattr(o, "finished", False):
-                        unfinished_owners_on_path.add(o.name)
-
-            if unfinished_owners_on_path - finished_owners:
-                # gate by the earliest unfinished owner on the candidate path
-                a = by_name[name]
-                for n in p[1:]:
-                    owners_here = [o for o in active_claims.get(n, []) if not getattr(o, "finished", False)]
-                    if owners_here:
-                        a.waiting = True
-                        a.blocker_owner = owners_here[0].name
-                        a.blocked_by_node = n
-                        _log_gate(a, a.blocker_owner, a.blocked_by_node)
-                        gated_any.add(a.name)
-                        break
-                continue
-
-            filtered[name] = p
-        candidate_paths = filtered
-
-    if not candidate_paths:
-        # clear gate spam only for those NOT gated by any rule this round
-        for a in waiters:
-            if a.name not in gated_any and getattr(a, "_gate_state", None) is not None:
-                a._gate_state = None
-        return False
-
-    # ---- Step 3: waiter-vs-waiter arbitration (FULL only)
-    this_round_path: Dict[str, List[str]] = dict(candidate_paths)
-
+    # -------- arbitration among prefixes --------
+    # Node -> agents wanting it (exclude each source node so starts can coincide)
     claims: Dict[str, List[Agent]] = {}
-    def _dist_in_path(path: List[str], node: str) -> float:
-        if node not in path:
-            return math.inf
-        idx, d = path.index(node), 0.0
-        for i in range(idx):
-            u, v = path[i], path[i+1]
-            d += float(graph[u][v].get('weight', 1.0))
-        return d
-
-    for name, p in this_round_path.items():
+    for name, seg in safe_segments.items():
         ag = by_name[name]
-        for n in p[1:]:
+        for n in seg[1:]:
             claims.setdefault(n, []).append(ag)
 
-    conflict_nodes = {n for n, ls in claims.items() if len(ls) > 1}
+    conflict_nodes = {n for n, lst in claims.items() if len(lst) > 1}
 
-    any_resumed = False
     accepted: List[Agent] = []
-
     if conflict_nodes:
-        # Choose ONE global winner nearest to its own earliest contested node (tie-break by priority)
         contenders = set()
         for n in conflict_nodes:
             contenders.update(claims[n])
 
         def winner_key(ag: Agent):
-            p = this_round_path[ag.name]
-            contested = [n for n in p[1:] if n in conflict_nodes]
-            d_first = min((_dist_in_path(p, n) for n in contested), default=math.inf)
+            seg = safe_segments[ag.name]
+            contested = [n for n in seg[1:] if n in conflict_nodes]
+            d_first = min((_dist_in_path(seg, n) for n in contested), default=math.inf)
             return (d_first, ag.priority())
 
         winner = min(contenders, key=winner_key)
-        accepted = [winner]  # <-- ONLY the winner this pass
+        accepted.append(winner)
 
-        # Gate losers that overlap winner behind the winner's GOAL (log once)
-        winner_nodes = set(this_round_path[winner.name][1:])
-        for name, p in this_round_path.items():
-            if name == winner.name:
+        # Gate losers that share ANY node with winner behind the FIRST shared node
+        winner_nodes = set(safe_segments[winner.name][1:])
+        for ag in contenders:
+            if ag is winner:
                 continue
-            if not set(p[1:]).isdisjoint(winner_nodes):
-                ag = by_name[name]
+            seg = safe_segments[ag.name]
+            shared = [n for n in seg[1:] if n in winner_nodes]
+            if shared:
+                first_shared = shared[0]
                 ag.waiting = True
                 ag.blocker_owner = winner.name
-                ag.blocked_by_node = by_name[winner.name].goal
+                ag.blocked_by_node = first_shared
                 _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
 
+        # Accept also other disjoint segments (non-contenders)
+        used = set(safe_segments[winner.name][1:])
+        for nm, seg in safe_segments.items():
+            ag = by_name[nm]
+            if ag in contenders or ag is winner:
+                continue
+            if set(seg[1:]).isdisjoint(used):
+                accepted.append(ag)
+                used |= set(seg[1:])
     else:
-        # No conflicts → accept all (still require node-disjointness among them)
-        used_nodes: set = set()
-        for name, p in this_round_path.items():
-            if set(p[1:]).isdisjoint(used_nodes):
-                accepted.append(by_name[name])
-                used_nodes |= set(p[1:])
+        accepted = [by_name[nm] for nm in safe_segments.keys()]
 
-    # ---- Step 4: apply releases
+    # -------- apply releases --------
+    any_resumed = False
     if accepted:
+        print("[Replan] Accepted releases this pass:")
         for a in accepted:
-            p = this_round_path[a.name]
-            frag = [(p[j], p[j+1]) for j in range(len(p)-1)]
+            seg = safe_segments[a.name]
+            frag = [(seg[j], seg[j + 1]) for j in range(len(seg) - 1)]
             a.fragments.append(frag)
             a.route += frag
-            if a.full_route and a.full_route[-1] == p[0]:
-                a.full_route += p[1:]
+            if a.full_route and a.full_route[-1] == seg[0]:
+                a.full_route += seg[1:]
             else:
-                a.full_route += p
+                a.full_route += seg
             a.replanned = True
             a.waiting = False
             a.blocked_by_node = None
             a.blocker_owner = None
-            a._gate_state = None  # clear debounce state after release
-            print(f"[FragmentPlanner] {a.name} appended fragment: {p}")
+            a.fragment_end_node = seg[-1]  # tell the UI/loop what safepoint to watch
             any_resumed = True
+            print(f"  • {a.name} → fragment end = {a.fragment_end_node} (seg: {_fmt_path(seg)})")
+
+        # For non-accepted with a direct gate hint, log once
+        for nm, hint in gate_hint.items():
+            ag = by_name[nm]
+            if ag in accepted:
+                continue
+            ag.waiting = True
+            ag.blocker_owner, ag.blocked_by_node = hint
+            _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
+
+        if verbose_snapshots:
+            _print_safepoints_snapshot()
         return any_resumed
 
-    # clear stale gate states for any waiter not gated this round
-    for a in waiters:
-        if a.name not in gated_any and getattr(a, "_gate_state", None) is not None:
-            a._gate_state = None
+    # Nobody accepted (rare) — still report gates and snapshot
+    for nm, hint in gate_hint.items():
+        ag = by_name[nm]
+        ag.waiting = True
+        ag.blocker_owner, ag.blocked_by_node = hint
+        _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
+
+    if verbose_snapshots:
+        _print_safepoints_snapshot()
     return False

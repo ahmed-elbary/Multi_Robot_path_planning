@@ -16,10 +16,11 @@ def animate_paths(
     topo_map,
     get_orientation_from_map,
     fps=10,
-    wait_time=3.0,       # small release buffer (seconds) after arrival
+    wait_time=0.0,       # small release buffer (seconds) after arrival
     show_legend=False,
     graph=None,
     save=False,
+    verbose_snapshots=False,
 ):
     # Arrival tolerance in map units — lets us treat "close enough" as arrived
     reach_tol = 0.25
@@ -172,9 +173,10 @@ def animate_paths(
 
     def update(frame):
         nonlocal replan_banner_printed, first_replan_done, last_poll_frame
+
         artists = []
 
-        # draw agents
+        # ---- draw agents (reuse one arrow per agent)
         for trail in trails:
             if not trail["coords"]:
                 continue
@@ -184,15 +186,12 @@ def animate_paths(
             dx, dy = 0.5 * math.cos(yaw), 0.5 * math.sin(yaw)
 
             trail["dot"].set_data([x], [y])
-
-            # reuse the same arrow patch every frame
             arrow = trail["arrow"]
             arrow.set_visible(True)
             arrow.set_positions((x, y), (x + dx, y + dy))
-
             artists.extend([trail["dot"], arrow])
 
-        # mark finished by reaching goal (with tolerance)
+        # ---- detect goal reached (for nice bookkeeping)
         for a in agents:
             if getattr(a, "goal", None) and not getattr(a, "finished", False):
                 tr = agent_to_trail.get(a)
@@ -203,12 +202,27 @@ def animate_paths(
                     if (x - gx) ** 2 + (y - gy) ** 2 <= reach_tol ** 2:
                         a.finished = True
 
-        finished_owners = {ag.name for ag in agents if getattr(ag, "finished", False)}
+        # ---- trigger replan when ANY agent completes its current fragment
+        fragment_completed = False
+        for a in agents:
+            endn = getattr(a, "fragment_end_node", None)
+            if not endn:
+                continue
+            tr = agent_to_trail.get(a)
+            if not tr or not tr["coords"]:
+                continue
+            local_i = max(0, min(frame - tr.get("start_frame", 0), len(tr["coords"]) - 1))
+            x, y = tr["coords"][local_i]
+            ex, ey = positions[endn]
+            if (x - ex) ** 2 + (y - ey) ** 2 <= reach_tol ** 2:
+                # mark consumed so we don't re-trigger on every frame afterward
+                a.fragment_end_node = None
+                fragment_completed = True
 
-        # First-time cascade: only after someone has finished
-        if graph and finished_owners and not first_replan_done:
+        # ---- run replan if a fragment just completed (immediate)
+        if graph and fragment_completed:
             if not replan_banner_printed:
-                print("\n[→] Replan loop 1: attempting to resume all waiting agents...")
+                print("\n[→] Replan: fragment completed — resuming waiters if possible...")
                 replan_banner_printed = True
 
             start_frames = {t["agent"].name: t.get("start_frame", 0) for t in trails}
@@ -217,31 +231,30 @@ def animate_paths(
                 frame=frame,
                 positions=positions,
                 release_delay_frames=int(wait_time * fps),
-                finished_owners=finished_owners,
                 start_frames=start_frames,
                 reach_tol=reach_tol,
+                verbose_snapshots=False,
             )
-
             if resumed:
                 for a in agents:
                     if getattr(a, "replanned", False):
                         print(f"[Replan] {a.name} resumed: {a.full_route}")
-                        # update this agent's trajectory in-place
                         rebuild_dynamic_traj(a, positions, get_orientation_from_map, fps=fps)
                         tr = agent_to_trail.get(a)
                         if tr:
                             tr["coords"] = a.dynamic_coords
                             tr["angles"] = a.dynamic_angles
-                            tr["start_frame"] = frame      # prevent teleport
-                            _refresh_dashed_path(tr, a)    # keep dashed path in sync
+                            tr["start_frame"] = frame
+                            # also refresh dashed path (keep your helper if you have it)
+                            if tr.get("path_line"):
+                                xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
+                                tr["path_line"].set_data(xs, ys)
                         a.replanned = False
-
                 print("[✓] One or more waiting agents successfully replanned.")
-                first_replan_done = True
-                last_poll_frame = frame   # avoid running periodic replan in the same frame
+                last_poll_frame = frame  # avoid double-running this frame
 
-        # Periodic polling while there are waiters — but only once we have at least one finisher
-        if graph and finished_owners and any(getattr(a, "waiting", False) for a in agents):
+        # ---- ALWAYS-ON periodic poll (so owners freeing a gate node can unlock waiters)
+        if graph and any(getattr(a, "waiting", False) for a in agents):
             if frame - last_poll_frame >= replan_poll_every:
                 last_poll_frame = frame
                 start_frames = {t["agent"].name: t.get("start_frame", 0) for t in trails}
@@ -250,7 +263,6 @@ def animate_paths(
                     frame=frame,
                     positions=positions,
                     release_delay_frames=int(wait_time * fps),
-                    finished_owners=finished_owners,
                     start_frames=start_frames,
                     reach_tol=reach_tol,
                 )
@@ -263,12 +275,15 @@ def animate_paths(
                             if tr:
                                 tr["coords"] = a.dynamic_coords
                                 tr["angles"] = a.dynamic_angles
-                                tr["start_frame"] = frame   # prevent teleport
-                                _refresh_dashed_path(tr, a)
+                                tr["start_frame"] = frame
+                                if tr.get("path_line"):
+                                    xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
+                                    tr["path_line"].set_data(xs, ys)
                             a.replanned = False
                     print("[✓] One or more waiting agents successfully replanned.")
 
         return artists
+
 
     if show_legend:
         from matplotlib.lines import Line2D
