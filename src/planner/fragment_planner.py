@@ -5,7 +5,7 @@ import networkx as nx
 from .agent import Agent
 
 
-# ------------------------------- helpers -------------------------------
+# =============================== small helpers ===============================
 
 def _fmt_path(p: Optional[List[str]], limit: int = 18) -> str:
     """Pretty-print a node list with optional truncation."""
@@ -17,7 +17,10 @@ def _fmt_path(p: Optional[List[str]], limit: int = 18) -> str:
 
 
 def _node_claims(agents: List[Agent]) -> Dict[str, List[Agent]]:
-    """node -> agents whose full_route contains that node (excluding start)."""
+    """
+    Build a map: node -> [agents that pass through that node in full_route].
+    (We ignore the start node because it's initially occupied by the agent.)
+    """
     claims: Dict[str, List[Agent]] = {}
     for a in agents:
         if getattr(a, "full_route", None):
@@ -28,8 +31,9 @@ def _node_claims(agents: List[Agent]) -> Dict[str, List[Agent]]:
 
 def _compute_block_constraints(agents: List[Agent], graph: nx.Graph) -> Dict[str, List[Tuple[str, str]]]:
     """
-    For each agent, compute list of (node, owner_name) it must yield at,
-    based on nearest-wins priority at that node.
+    For each node with multiple claimers, pick an owner with 'nearest-wins'
+    (tie-break by agent.priority()). Return:
+      blocked_agent_name -> [(blocked_node, owner_name), ...]
     """
     constraints: Dict[str, List[Tuple[str, str]]] = {}
     claims = _node_claims(agents)
@@ -61,6 +65,7 @@ def _earliest_block_on_path(path: List[str], blocks: List[Tuple[str, str]]) -> O
 
 
 def _distance_to_node_in_route(agent: Agent, node: str, graph: nx.Graph) -> float:
+    """Accumulate edge weights along agent.full_route up to 'node' (∞ if not present)."""
     if not agent.full_route or node not in agent.full_route:
         return math.inf
     idx = agent.full_route.index(node)
@@ -72,6 +77,9 @@ def _distance_to_node_in_route(agent: Agent, node: str, graph: nx.Graph) -> floa
 
 
 def agent_has_priority(agents: List[Agent], node: str, graph: nx.Graph) -> Optional[Agent]:
+    """
+    Pick the agent with the smallest distance-to-node; tie-break by agent.priority().
+    """
     claimers = [a for a in agents if a.full_route and node in a.full_route]
     if not claimers:
         return None
@@ -80,12 +88,12 @@ def agent_has_priority(agents: List[Agent], node: str, graph: nx.Graph) -> Optio
     return scored[0][2]
 
 
-# ------------------------------- initial planning -------------------------------
+# =============================== initial planning ==============================
 
 def find_routes(agents: List[Agent], graph: nx.Graph):
     """
-    Space-aware: plan each agent sequentially on a filtered copy of the map.
-    Nodes occupied by previously planned agents are removed.
+    Space-aware planner: plan each agent on a filtered copy of the map.
+    Nodes occupied by already-planned agents are removed (except my own start/goal).
     """
     all_starts = {a.start for a in agents}
     for i, agent in enumerate(agents):
@@ -123,7 +131,9 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
 
 
 def find_critical_points(agents: List[Agent]) -> Dict[str, List[str]]:
-    """Return all critical nodes shared by more than one agent on their route."""
+    """
+    Return all critical nodes: nodes shared by >1 agent in their current edge-route.
+    """
     node_claims: Dict[str, List[str]] = {}
     for agent in agents:
         for _, v in agent.route:
@@ -131,7 +141,7 @@ def find_critical_points(agents: List[Agent]) -> Dict[str, List[str]]:
     return {n: names for n, names in node_claims.items() if len(names) > 1}
 
 
-# ------------------------------- initial safe split -------------------------------
+# =============================== initial safe split =============================
 
 def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points: List[str]):
     """
@@ -142,6 +152,8 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
     - Keep only the safe prefix up to the predecessor of that blocked node.
     - If no block applies, keep the full first fragment produced by find_routes.
     - Print a one-line summary showing the fragment end (safepoint).
+
+    Note: 'dangerous_points' is currently unused; kept for interface parity.
     """
     all_constraints = _compute_block_constraints(agents, graph)
 
@@ -193,6 +205,7 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
                   f"(seg: {_fmt_path(seg_nodes)})")
             continue
 
+        # Cut before the first blocked node
         cut_idx, blocked_node, owner = eb
         last_safe = agent.full_route[cut_idx - 1]  # predecessor of the blocked node
 
@@ -222,11 +235,11 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
               f"(seg: {_fmt_path(seg_nodes)}) | blocked ahead at {blocked_node} by {owner}")
 
 
-# ------------------------------- incremental replanning -------------------------------
+# =============================== incremental replanning =========================
 
 def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> bool:
     """
-    Fragment-to-next-safe policy with verbose, deduped logging.
+    Fragment-to-next-safe policy with concise, deduped logging.
 
     For each waiting agent:
       1) Build a filtered shortest path (what is free *now*).
@@ -234,15 +247,17 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
          (source .. last-safe-before-critical). If none, FULL→goal.
       3) If prefixes still conflict, release ONE global winner and gate others
          behind the winner at the first shared node.
+
+    Returns True iff at least one agent was released this call.
     """
     frame = kwargs.get("frame", 0)
     positions = kwargs.get("positions", {})
     release_delay_frames = int(kwargs.get("release_delay_frames", 0))
     reach_tol = float(kwargs.get("reach_tol", 0.20))
     start_frames = kwargs.get("start_frames", {})  # {agent_name: animation start frame}
-    verbose_snapshots = bool(kwargs.get("verbose_snapshots", True))
-
-    # -------- helpers (logging + geometry) --------
+    verbose_snapshots = bool(kwargs.get("verbose_snapshots", False))
+    
+    # ---- local helpers (logging + geometry) ----
     def _print_safepoints_snapshot():
         print("\n--- Safepoints snapshot ---")
         for a in agents:
@@ -262,13 +277,14 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         print("—" * 48)
 
     def _log_gate(agent: Agent, owner_name: str, gate_node: str):
-        # print only if gate changed (dedup noisy logs)
+        """Print a gate line only when the owner@node pair changes."""
         key = (owner_name, gate_node)
         if getattr(agent, "_gate_state", None) != key:
             print(f"[i] {agent.name} gated by {owner_name} at {gate_node}")
             agent._gate_state = key
 
     def first_frame_at_node(blocker: Agent, node: str) -> Optional[int]:
+        """Find the first animation frame where 'blocker' reaches 'node' (within tolerance)."""
         if not node or node not in positions or not getattr(blocker, "dynamic_coords", None):
             return None
         if not hasattr(blocker, "_node_frame_cache"):
@@ -285,20 +301,22 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         return None
 
     def has_reached_node(agent: Agent, node: str) -> bool:
-        # Compare against local time since this agent's current animation path started
+        """
+        Animation-aware reach check. Uses 'start_frames' to compute the agent's local
+        timeline; returns True once the agent has reached 'node' plus any release delay.
+        """
         local_start = int(start_frames.get(agent.name, 0))
         local_frame = frame - local_start
         if local_frame < 0:
             return False
         f = first_frame_at_node(agent, node)
         return f is not None and local_frame >= f + release_delay_frames
-    
 
     def owner_has_cleared(owner: Agent, node: str) -> bool:
         """
-        A contested node becomes free only after the owner has moved *past* it:
-        - If node is the owner's GOAL: require 'finished' (goal stays occupied).
-        - Otherwise: require the owner to have reached the *next* node after 'node'.
+        Edge-safe gating:
+          - If 'node' is the owner's GOAL, treat it as occupied until 'finished'.
+          - Otherwise require the owner to have reached the *next* node after 'node'.
         """
         if node == getattr(owner, "goal", None):
             return getattr(owner, "finished", False)
@@ -310,11 +328,11 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 next_node = fr[i + 1]
                 return has_reached_node(owner, next_node)
 
-        # If we don't find the node in the route (shouldn't happen), be conservative.
+        # If node not found in route, be conservative (still blocked).
         return False
 
-
     def _dist_in_path(path: List[str], node: str) -> float:
+        """Distance along 'path' up to 'node' using graph edge weights (∞ if absent)."""
         if node not in path:
             return math.inf
         d = 0.0
@@ -325,12 +343,12 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
 
     by_name = {a.name: a for a in agents}
 
-    # -------- who is waiting now --------
+    # ---- who is waiting now ----
     waiters: List[Agent] = [a for a in agents if getattr(a, "waiting", False) and not getattr(a, "replanned", False)]
     if not waiters:
         return False
 
-    # -------- active owners (claim nodes) --------
+    # ---- collect active owners (who currently "own" nodes) ----
     active_claims: Dict[str, List[Agent]] = {}
     for a in agents:
         if a in waiters:
@@ -345,28 +363,28 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                     active_claims.setdefault(n, []).append(a)
 
     def owner_blocking(node: str) -> Optional[Agent]:
+        """Return the active owner that is closest to 'node' (tie-break by priority)."""
         owners = active_claims.get(node, [])
         if not owners:
             return None
-        # nearest owner to node; tiebreak by agent priority
         return min(owners, key=lambda o: (_dist_in_path(getattr(o, "full_route", []) or [], node), o.priority()))
 
-    # -------- build filtered shortest paths (free *now*) --------
+    # ---- build filtered shortest paths (free *now*) ----
     full_candidates: Dict[str, List[str]] = {}
     for a in waiters:
+        # clear gate dedup once conditions may have changed
         if getattr(a, "_gate_state", None) is not None:
-            a._gate_state = None  # clear dedup once condition may have changed
+            a._gate_state = None
 
         Gf = graph.copy()
 
-        # Finished owners' goals are hard obstacles (except my goal & my source)
+        # 1) Finished owners' goals are hard obstacles (except my goal & my source)
         finished_goals = {b.goal for b in agents if b is not a and getattr(b, "finished", False)}
         for g in list(finished_goals):
             if g != getattr(a, "goal", None) and g != getattr(a, "wait_node", None) and g in Gf:
                 Gf.remove_node(g)
 
-        # NEW: treat other waiters' current nodes as hard obstacles
-        # (so nobody can plan through a node that is physically occupied by a waiting robot)
+        # 2) Other waiters' current nodes are also hard obstacles (physical occupancy)
         other_wait_nodes = [
             getattr(w, "wait_node", None)
             for w in waiters
@@ -376,13 +394,13 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             if wn in Gf:
                 Gf.remove_node(wn)
 
-        # Remove nodes currently blocked by ACTIVE owners (keep my source)
+        # 3) Prune nodes blocked by ACTIVE owners that haven't cleared them yet
         to_remove = []
         for n in list(Gf.nodes):
             if n == getattr(a, "wait_node", None):
                 continue
             owner = owner_blocking(n)
-            if owner is not None and not has_reached_node(owner, n):
+            if owner is not None and not owner_has_cleared(owner, n):
                 to_remove.append(n)
         for n in to_remove:
             if n in Gf:
@@ -398,18 +416,18 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             pass
 
-    # Log: candidates
-    print("\n[Replan] Candidates (filtered shortest paths):")
-    for a in waiters:
-        print(f"  - {a.name}: {_fmt_path(full_candidates.get(a.name))}")
-
+    # optional debug dump
     if verbose_snapshots:
         print("\n[Replan] Candidates (filtered shortest paths):")
         for a in waiters:
             print(f"  - {a.name}: {_fmt_path(full_candidates.get(a.name))}")
 
+    if not full_candidates:
+        if verbose_snapshots:
+            _print_safepoints_snapshot()
+        return False
 
-    # -------- cut each candidate to SAFE PREFIX (until first currently-owned node) --------
+    # ---- cut each candidate to SAFE PREFIX (until first currently-owned node) ----
     safe_segments: Dict[str, List[str]] = {}
     gate_hint: Dict[str, Tuple[str, str]] = {}  # name -> (owner_name, gate_node)
 
@@ -423,15 +441,14 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 blocker_owner = owner
                 break
 
-
         if block_index is None:
             safe_segments[name] = path  # FULL→goal
         else:
+            # safe up to predecessor of first blocked node; record a gate hint
             if block_index - 1 >= 0:
-                safe_segments[name] = path[:block_index]        # up to predecessor (safe)
-                gate_hint[name] = (blocker_owner.name, path[block_index])  # wait until owner reaches this node
+                safe_segments[name] = path[:block_index]
+                gate_hint[name] = (blocker_owner.name, path[block_index])
 
-    # Log: safe segments / gates
     if verbose_snapshots:
         print("[Replan] Safe segments (to next safepoint):")
         for a in waiters:
@@ -447,21 +464,20 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 else:
                     print(f"  - {a.name}: <no safe prefix now>")
 
-
     if not safe_segments:
-        # Everyone blocked immediately: log dedup gate info if we have it
+        # Everyone blocked immediately: emit (deduped) gate info, then snapshot
         for name, hint in gate_hint.items():
             ag = by_name[name]
             _log_gate(ag, hint[0], hint[1])
-        _print_safepoints_snapshot()
+        if verbose_snapshots:
+            _print_safepoints_snapshot()
         return False
 
-    # -------- arbitration among prefixes --------
-    # Node -> agents wanting it (exclude each source node so starts can coincide)
+    # ---- arbitration among prefixes (release at most one conflicting group) ----
     claims: Dict[str, List[Agent]] = {}
     for name, seg in safe_segments.items():
         if len(seg) < 2:
-            continue  # ignore no-op segments (only the source node)
+            continue  # ignore no-op segments (single-node, no edge)
         ag = by_name[name]
         for n in seg[1:]:
             claims.setdefault(n, []).append(ag)
@@ -483,10 +499,11 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         winner = min(contenders, key=winner_key)
         accepted.append(winner)
 
+        # Also accept disjoint segments
         used = set(safe_segments[winner.name][1:])
         for nm, seg in safe_segments.items():
             if len(seg) < 2:
-                continue  # still ignore no-op segments
+                continue
             ag = by_name[nm]
             if ag in contenders or ag is winner:
                 continue
@@ -494,20 +511,19 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 accepted.append(ag)
                 used |= set(seg[1:])
     else:
-        # no conflicts → accept only segments that actually move
+        # No conflicts: accept only segments that actually move
         accepted = [by_name[nm] for nm, seg in safe_segments.items() if len(seg) >= 2]
 
-    # -------- apply releases --------
+    # ---- apply releases ----
     any_resumed = False
     if accepted:
         print("[Replan] Accepted releases this pass:")
         for a in accepted:
             seg = safe_segments[a.name]
 
-            # NEW: ignore no-op fragments (single-node, no edge). Keep waiting.
+            # Ignore no-op fragments (single-node).
             if len(seg) < 2:
                 print(f"  • {a.name} → no-op fragment at {seg[-1]} (still gated); keeping waiting state")
-                # preserve/refresh its gate if we computed one
                 if a.name in gate_hint:
                     a.waiting = True
                     a.blocker_owner, a.blocked_by_node = gate_hint[a.name]
@@ -529,7 +545,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             any_resumed = True
             print(f"  • {a.name} → fragment end = {a.fragment_end_node} (seg: {' -> '.join(seg)})")
 
-        # For non-accepted with a direct gate hint, log once
+        # Gate non-accepted candidates that had a direct gate hint
         for nm, hint in gate_hint.items():
             ag = by_name[nm]
             if ag in accepted:
@@ -538,7 +554,8 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             ag.blocker_owner, ag.blocked_by_node = hint
             _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
 
-        _print_safepoints_snapshot()
+        if verbose_snapshots:
+            _print_safepoints_snapshot()
         return any_resumed
 
     # Nobody accepted (rare) — still report gates and snapshot

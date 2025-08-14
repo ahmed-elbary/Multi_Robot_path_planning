@@ -7,36 +7,48 @@
 
 # Parking area (3 nodes)
 - node:
-    name:  Park1
+    name:  Park3
     pose:
       position: {x: 2.5, y: 1.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:   
-      - edge_id: Park1_Start1
+      - edge_id: Park3_Start1
         node: Start1
-      - edge_id: Park1_Start2
+      - edge_id: Park3_Start2
         node: Start2
+      - edge_id: Park3_Park1
+        node: Park1
+      - edge_id: Park3_Park2  
+        node: Park2 
 
 - node:
-    name: Park2
+    name: Park1
     pose:
       position: {x: 1.0, y: 0.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges: 
-      - edge_id: Park2_Start1
+      - edge_id: Park1_Start1
         node: Start1
+      - edge_id: Park1_Park3
+        node: Park3
+      - edge_id: Park1_Park2
+        node: Park2
 
 - node:
-    name: Park3
+    name: Park2
     pose:
       position: {x: 4.0, y: 0.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Park3_Start2
+      - edge_id: Park2_Start2
         node: Start2
+      - edge_id: Park2_Park3
+        node: Park3
+      - edge_id: Park2_Park1
+        node: Park1
 
 # Start nodes (3 nodes)
 - node:
@@ -46,10 +58,10 @@
       position: {x: 1.0, y: 2.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
     edges:
+      - edge_id: Start1_Park3
+        node: Park3
       - edge_id: Start1_Park1
         node: Park1
-      - edge_id: Start1_Park2
-        node: Park2
       - edge_id: Start1_T00
         node: T00
       - edge_id: Start1_T10
@@ -67,10 +79,10 @@
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
 
     edges:
-      - edge_id: Start2_Park1
-        node: Park1
       - edge_id: Start2_Park3
         node: Park3
+      - edge_id: Start2_Park2
+        node: Park2
       - edge_id: Start2_T30
         node: T30
       - edge_id: Start2_T40

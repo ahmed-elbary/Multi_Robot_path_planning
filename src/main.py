@@ -14,31 +14,29 @@ from planner.visualiser import animate_paths
 def parse_args():
     parser = argparse.ArgumentParser(description="Multi-Robot Fragment-Based Path Planner")
     parser.add_argument('--map', type=str, default='data/map.yaml', help='Path to YAML map file')
-    parser.add_argument('--max_loops', type=int, default=5, help='Max replan loops per cascade')
+    parser.add_argument('--max_loops', type=int, default=5, help='Max replan loops per cascade (terminal mode)')
     parser.add_argument('--animate', action='store_true', help='Show matplotlib animation')
     parser.add_argument('--fps', type=int, default=10, help='Animation FPS')
     parser.add_argument('--save', action='store_true', help='Save animation to file (uses default name)')
+    parser.add_argument('--quiet', action='store_true', help='Reduce replanning logs/snapshots')
     return parser.parse_args()
 
 
-
-
+# ====================== choose a test set ======================
 def create_agents() -> list:
+    # Example 3-robot case (matches your recent runs)
     return [
         Agent("Robot1", "Park1", "T11"),
-        Agent("Robot2", "T43", "Park3"),
-        Agent("Robot3", "Start1", "Park2"),
-        
-
+        Agent("Robot2", "Park2", "Start1"),
+        Agent("Robot3", "Park3", "T33"),
     ]
+
 
 # def create_agents() -> list:
 #     return [
 #         Agent("Robot1", "Park1", "Start2"),
 #         Agent("Robot2", "Park2", "D3"),
 #         Agent("Robot3", "Park3", "C2"),
-#         Agent("Robot4", "Park4", "B2"),
-#         Agent("Robot5", "Park5", "B1"),
 #     ]
 
 # def create_agents() -> list:
@@ -49,6 +47,8 @@ def create_agents() -> list:
 #         Agent("Robot4", "Park4", "E"),
 #         Agent("Robot5", "Park5", "NE"),
 #     ]
+# ===============================================================
+
 
 def pretty_frag(frag):
     return " -> ".join([frag[0][0]] + [v for (_, v) in frag]) if frag else ""
@@ -59,9 +59,9 @@ def print_summary(agents, title="\n==== Agent Routes (fragments) ===="):
     for agent in agents:
         status = []
         status.append("waiting" if agent.waiting else "active")
-        if agent.finished:
+        if getattr(agent, "finished", False):
             status.append("finished")
-        if agent.replanned:
+        if getattr(agent, "replanned", False):
             status.append("replanned")
 
         print(f"\nAgent: {agent.name} [{', '.join(status)}]")
@@ -77,31 +77,35 @@ def print_summary(agents, title="\n==== Agent Routes (fragments) ===="):
 
 def main():
     args = parse_args()
+
+    # ===== 1) Load map & build graph =====
     print("[✓] Loading map...")
     map_data = load_map(args.map)
     graph = build_graph_from_yaml(map_data)
 
+    # ===== 2) Create agents =====
     print("[✓] Creating agents...")
     agents = create_agents()
 
-    # ===== 1) Initial space-aware planning on filtered maps =====
+    # ===== 3) Initial space-aware planning on filtered maps =====
     print("[✓] Space-aware planning on filtered maps...")
     find_routes(agents, graph)
 
     critical = find_critical_points(agents)
     dangerous_points = list(critical.keys())
     if dangerous_points:
-        print(f"[✓] Critical points found: {dangerous_points}")
+        print(f"\n[✓] Critical points found: {dangerous_points}\n")
+        # Computes initial safe prefixes & waiting states
         split_critical_paths(graph, agents, dangerous_points)
-        assign_waiting_agents(agents)
 
     print_summary(agents, "\n==== Initial Plan (with fragments) ====")
 
-    # ===== Optional live animation =====
+    # ===== 4) Animation mode =====
     if args.animate:
         positions = {node: tuple(data['pos']) for node, data in graph.nodes(data=True)}
 
         def get_orientation_from_map(node_name):
+            # Pull yaw from the YAML map (z,w quaternion → yaw)
             for entry in map_data:
                 if entry['node']['name'] == node_name:
                     q = entry['node']['pose']['orientation']
@@ -109,7 +113,7 @@ def main():
                     return math.atan2(2.0 * w * z, 1.0 - 2.0 * (z ** 2))
             return None
 
-        print("[✓] Launching animation...")
+        print("\n[✓] Launching animation...")
         animate_paths(
             agents=agents,
             positions=positions,
@@ -119,16 +123,19 @@ def main():
             show_legend=True,
             graph=graph,
             save=args.save
+            # (Visualizer is expected to call replan_waiting_agents internally per frame.)
         )
+
         print_summary(agents, "\n==== After Animation ====")
         return
 
-    # ===== Helpers for TERMINAL mode =====
+    # ===== 5) Terminal mode (no --animate) =====
+    # Simple cascade runner that simulates finishers so dependent waiters can release.
     def run_cascade(finishers: set[str], label: str):
         """
-        Run up to max_loops of replan calls, only releasing waiters whose blocker is in `finishers`
-        (or who can find an alternate path around any active owner).
-        Any winners we simulate to the goal are added to `finishers` so dependent waiters can chain.
+        Run up to max_loops of replan calls, releasing waiters if their blockers are in `finishers`
+        (or if they can find an alternate path around any active owner). Winners are simulated
+        to their goals and added to `finishers` to allow chained releases within the cascade.
         """
         print(f"\n--- Replan cascade after {label} ---\n")
         finished_owners = set(finishers)
@@ -138,7 +145,12 @@ def main():
                 break
             loop += 1
             print(f"[→] Replan loop {loop}: attempting to resume all waiting agents...")
-            resumed = replan_waiting_agents(agents, graph, finished_owners=finished_owners)
+
+            resumed = replan_waiting_agents(
+                agents,
+                graph,
+                verbose_snapshots=not args.quiet
+            )
 
             winners = [a for a in agents if getattr(a, "replanned", False) and not a.waiting]
             advanced_only = [a for a in agents if getattr(a, "replanned", False) and a.waiting]
@@ -154,12 +166,12 @@ def main():
                 print("[i] All newly-advanced agents are still gated; waiting for a blocker to finish.")
                 break
 
-            # Simulate winners reaching their goals immediately (terminal mode)
+            # Simulate winners reaching their goals immediately (terminal demo convenience)
             for w in winners:
                 w.current_node = w.goal
                 w.finished = True
                 w.replanned = False
-                finished_owners.add(w.name)  # let dependents release in the same cascade
+                finished_owners.add(w.name)
                 print(f"[✓] Simulating {w.name} reached goal at {w.goal}")
 
             print_summary(agents, "\n==== After Replan ====")
@@ -167,45 +179,37 @@ def main():
             if all(getattr(a, "finished", False) for a in agents):
                 break
 
-        return
-
-    # ===== Terminal-only flow (no --animate) =====
-    # Simulate Robot1 finishing first (your demo trigger)
+    # Demo trigger: simulate Robot1 finishing first, then cascade.
     robot1 = next((a for a in agents if a.name == "Robot1"), None)
     if robot1 and robot1.full_route:
         robot1.current_node = robot1.goal
         robot1.finished = True
         print(f"\n[✓] Simulating {robot1.name} has reached goal at {robot1.current_node}")
 
-    # Cascade constrained to Robot1 as the finisher
     run_cascade({robot1.name} if robot1 else set(), label="Robot1")
 
-    # If anyone is still waiting, finish the *real* blocker next and cascade again.
+    # If anyone is still waiting, identify an unfinished blocker and finish it next, then cascade again.
     safety = 0
     while any(a.waiting for a in agents) and safety < len(agents) * 3:
         safety += 1
-        # Count which owners are actually blocking current waiters
         waiter_blockers = {}
         for a in agents:
             if getattr(a, "waiting", False) and getattr(a, "blocker_owner", None):
                 waiter_blockers[a.blocker_owner] = waiter_blockers.get(a.blocker_owner, 0) + 1
 
-        # Choose a blocker that isn't already finished
         candidates = [a for a in agents if a.name in waiter_blockers and not getattr(a, "finished", False)]
         if not candidates:
             print("[i] No unfinished blockers identified; stopping.")
             break
 
-        # Prefer the one blocking the most waiters; tiebreak by agent.priority()
+        # Prefer the one blocking the most waiters; tie-break by agent.priority()
         owner = min(candidates, key=lambda o: (-waiter_blockers[o.name], o.priority()))
         owner.current_node = owner.goal
         owner.finished = True
         print(f"\n[✓] Simulating {owner.name} has reached goal at {owner.goal}")
 
-        # Now cascade only for waiters gated by this owner; winners can chain within the cascade
         run_cascade({owner.name}, label=owner.name)
 
-    # final summary
     print_summary(agents, "\n==== Final Summary ====")
 
 

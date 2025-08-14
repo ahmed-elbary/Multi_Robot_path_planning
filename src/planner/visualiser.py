@@ -150,8 +150,8 @@ def animate_paths(
 
         max_frames = max(max_frames, len(agent.dynamic_coords))
 
-    for t in trails:
-        print(f"[Viz:init] {t['agent'].name} dynamic frames: {len(t['coords'])}")
+    # for t in trails:
+    #     print(f"[Viz:init] {t['agent'].name} dynamic frames: {len(t['coords'])}")
     agent_to_trail = {t["agent"]: t for t in trails}
 
     replan_banner_printed = False
@@ -222,7 +222,7 @@ def animate_paths(
         # ---- run replan if a fragment just completed (immediate)
         if graph and fragment_completed:
             if not replan_banner_printed:
-                print("\n[→] Replan: fragment completed — resuming waiters if possible...")
+                print("\n[→] Replan: fragment completed — resuming waiters if possible...\n")
                 replan_banner_printed = True
 
             start_frames = {t["agent"].name: t.get("start_frame", 0) for t in trails}
@@ -250,7 +250,7 @@ def animate_paths(
                                 xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
                                 tr["path_line"].set_data(xs, ys)
                         a.replanned = False
-                print("[✓] One or more waiting agents successfully replanned.")
+                print("[✓] One or more waiting agents successfully replanned.\n")
                 last_poll_frame = frame  # avoid double-running this frame
 
         # ---- ALWAYS-ON periodic poll (so owners freeing a gate node can unlock waiters)
@@ -280,7 +280,7 @@ def animate_paths(
                                     xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
                                     tr["path_line"].set_data(xs, ys)
                             a.replanned = False
-                    print("[✓] One or more waiting agents successfully replanned.")
+                    print("[✓] One or more waiting agents successfully replanned.\n")
 
         return artists
 
