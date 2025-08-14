@@ -365,13 +365,24 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             if g != getattr(a, "goal", None) and g != getattr(a, "wait_node", None) and g in Gf:
                 Gf.remove_node(g)
 
+        # NEW: treat other waiters' current nodes as hard obstacles
+        # (so nobody can plan through a node that is physically occupied by a waiting robot)
+        other_wait_nodes = [
+            getattr(w, "wait_node", None)
+            for w in waiters
+            if (w is not a and getattr(w, "wait_node", None))
+        ]
+        for wn in other_wait_nodes:
+            if wn in Gf:
+                Gf.remove_node(wn)
+
         # Remove nodes currently blocked by ACTIVE owners (keep my source)
         to_remove = []
         for n in list(Gf.nodes):
             if n == getattr(a, "wait_node", None):
                 continue
             owner = owner_blocking(n)
-            if owner is not None and not owner_has_cleared(owner, n):
+            if owner is not None and not has_reached_node(owner, n):
                 to_remove.append(n)
         for n in to_remove:
             if n in Gf:
@@ -449,6 +460,8 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
     # Node -> agents wanting it (exclude each source node so starts can coincide)
     claims: Dict[str, List[Agent]] = {}
     for name, seg in safe_segments.items():
+        if len(seg) < 2:
+            continue  # ignore no-op segments (only the source node)
         ag = by_name[name]
         for n in seg[1:]:
             claims.setdefault(n, []).append(ag)
@@ -470,23 +483,10 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         winner = min(contenders, key=winner_key)
         accepted.append(winner)
 
-        # Gate losers that share ANY node with winner behind the FIRST shared node
-        winner_nodes = set(safe_segments[winner.name][1:])
-        for ag in contenders:
-            if ag is winner:
-                continue
-            seg = safe_segments[ag.name]
-            shared = [n for n in seg[1:] if n in winner_nodes]
-            if shared:
-                first_shared = shared[0]
-                ag.waiting = True
-                ag.blocker_owner = winner.name
-                ag.blocked_by_node = first_shared
-                _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
-
-        # Accept also other disjoint segments (non-contenders)
         used = set(safe_segments[winner.name][1:])
         for nm, seg in safe_segments.items():
+            if len(seg) < 2:
+                continue  # still ignore no-op segments
             ag = by_name[nm]
             if ag in contenders or ag is winner:
                 continue
@@ -494,7 +494,8 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
                 accepted.append(ag)
                 used |= set(seg[1:])
     else:
-        accepted = [by_name[nm] for nm in safe_segments.keys()]
+        # no conflicts → accept only segments that actually move
+        accepted = [by_name[nm] for nm, seg in safe_segments.items() if len(seg) >= 2]
 
     # -------- apply releases --------
     any_resumed = False
@@ -502,7 +503,18 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         print("[Replan] Accepted releases this pass:")
         for a in accepted:
             seg = safe_segments[a.name]
-            frag = [(seg[j], seg[j + 1]) for j in range(len(seg) - 1)]
+
+            # NEW: ignore no-op fragments (single-node, no edge). Keep waiting.
+            if len(seg) < 2:
+                print(f"  • {a.name} → no-op fragment at {seg[-1]} (still gated); keeping waiting state")
+                # preserve/refresh its gate if we computed one
+                if a.name in gate_hint:
+                    a.waiting = True
+                    a.blocker_owner, a.blocked_by_node = gate_hint[a.name]
+                    _log_gate(a, a.blocker_owner, a.blocked_by_node)
+                continue
+
+            frag = [(seg[j], seg[j+1]) for j in range(len(seg)-1)]
             a.fragments.append(frag)
             a.route += frag
             if a.full_route and a.full_route[-1] == seg[0]:
@@ -513,9 +525,9 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             a.waiting = False
             a.blocked_by_node = None
             a.blocker_owner = None
-            a.fragment_end_node = seg[-1]  # tell the UI/loop what safepoint to watch
+            a.fragment_end_node = seg[-1]
             any_resumed = True
-            print(f"  • {a.name} → fragment end = {a.fragment_end_node} (seg: {_fmt_path(seg)})")
+            print(f"  • {a.name} → fragment end = {a.fragment_end_node} (seg: {' -> '.join(seg)})")
 
         # For non-accepted with a direct gate hint, log once
         for nm, hint in gate_hint.items():
@@ -526,8 +538,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             ag.blocker_owner, ag.blocked_by_node = hint
             _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
 
-        if verbose_snapshots:
-            _print_safepoints_snapshot()
+        _print_safepoints_snapshot()
         return any_resumed
 
     # Nobody accepted (rare) — still report gates and snapshot

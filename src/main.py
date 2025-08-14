@@ -25,10 +25,11 @@ def parse_args():
 
 def create_agents() -> list:
     return [
-        Agent("Robot1", "Park1", "Spare1"),
-        Agent("Robot2", "Park2", "T50"),
-        Agent("Robot3", "Park3", "T52"),
-        Agent("Robot4", "Spare1", "T21"),
+        Agent("Robot1", "Park1", "T11"),
+        Agent("Robot2", "T43", "Park3"),
+        Agent("Robot3", "Start1", "Park2"),
+        
+
     ]
 
 # def create_agents() -> list:
