@@ -24,7 +24,7 @@ def parse_args():
 
 # ====================== choose a test set ======================
 def create_agents() -> list:
-    # Example 3-robot case (matches your recent runs)
+    # Example 3-robot case 
     return [
         Agent("Robot1", "Park1", "T11"),
         Agent("Robot2", "Park2", "Start1"),
