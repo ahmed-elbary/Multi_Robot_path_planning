@@ -17,10 +17,7 @@
         node: Start1
       - edge_id: Park3_Start2
         node: Start2
-      # - edge_id: Park3_Park1
-      #   node: Park1
-      # - edge_id: Park3_Park2  
-      #   node: Park2 
+
 
 - node:
     name: Park1
@@ -31,10 +28,7 @@
     edges: 
       - edge_id: Park1_Start1
         node: Start1
-      # - edge_id: Park1_Park3
-      #   node: Park3
-      # - edge_id: Park1_Park2
-      #   node: Park2
+
 
 - node:
     name: Park2
@@ -45,10 +39,7 @@
     edges:
       - edge_id: Park2_Start2
         node: Start2
-      # - edge_id: Park2_Park3
-      #   node: Park3
-      # - edge_id: Park2_Park1
-      #   node: Park1
+
 
 # Start nodes (3 nodes)
 - node:

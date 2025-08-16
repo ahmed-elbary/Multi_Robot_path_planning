@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import FancyArrowPatch
+import os
 
 try:
     from .fragment_planner import replan_waiting_agents
@@ -53,51 +54,79 @@ def animate_paths(
     trails, max_frames = [], 0
 
     # --- build per-frame coords from full_route
-    def rebuild_dynamic_traj(agent, positions, get_orientation_from_map, fps=10):
+    def rebuild_dynamic_traj(agent, positions, get_orientation_from_map, fps=10, start_index=0, resume_xy=None):
+        """
+        Build per-frame coords that exactly follow agent.full_route[start_index:].
+        If resume_xy is provided, the first sample of the new trajectory starts
+        at that XY (visual continuity), then heads to the next waypoint.
+        """
         path = agent.full_route if getattr(agent, "full_route", None) else []
-        # reset cache (used by planner to detect per-node arrival frames)
         agent._node_frame_cache = {}
 
-        if not path or len(path) < 2:
-            agent.dynamic_coords = [positions[path[0]]] if path else []
-            agent.dynamic_angles = [0.0] if path else []
-            if path:
-                agent._node_frame_cache[path[0]] = 0
+        # clamp defensive
+        if not path:
+            agent.dynamic_coords = []
+            agent.dynamic_angles = []
             return
+
+        if start_index >= len(path) - 1:
+            # no edges left; pin at last node
+            last = path[-1]
+            xy = resume_xy if resume_xy is not None else positions[last]
+            agent.dynamic_coords = [xy]
+            agent.dynamic_angles = [get_orientation_from_map(last) or 0.0]
+            agent._node_frame_cache[last] = 0
+            return
+
+        path = path[start_index:]  # suffix we’ll animate
 
         coords, angles = [], []
 
-        # ensure start is recorded
-        x0, y0 = positions[path[0]]
+        # starting sample: current XY if supplied, otherwise node coord
+        x0, y0 = (resume_xy if resume_xy is not None else positions[path[0]])
         coords.append((x0, y0))
-        angles.append(0.0)
+        # set a reasonable initial heading (toward the next waypoint)
+        x1, y1 = positions[path[0]]
+        x2, y2 = positions[path[1]]
+        init_yaw = math.atan2(y2 - y1, x2 - x1)
+        angles.append(init_yaw)
         agent._node_frame_cache[path[0]] = 0
 
+                # interpolate each edge in the suffix
         for i in range(len(path) - 1):
             n1, n2 = path[i], path[i + 1]
-            x1, y1 = positions[n1]
-            x2, y2 = positions[n2]
-            steps = max(int(math.hypot(x2 - x1, y2 - y1) * fps), 1)
 
-            # interpolate (without ever landing exactly at x2,y2) until final step
+            # FIRST segment after a replan: go from resume_xy → n2
+            if i == 0 and resume_xy is not None:
+                sx, sy = x0, y0                     # current on-screen XY
+                ex, ey = positions[n2]
+            else:
+                sx, sy = positions[n1]
+                ex, ey = positions[n2]
+
+            steps = max(int(math.hypot(ex - sx, ey - sy) * fps), 1)
+
+            # interpolate smoothly from (sx,sy) to (ex,ey)
             for t in range(1, steps):
                 a = t / steps
-                x = (1 - a) * x1 + a * x2
-                y = (1 - a) * y1 + a * y2
+                x = (1 - a) * sx + a * ex
+                y = (1 - a) * sy + a * ey
                 coords.append((x, y))
-                angles.append(math.atan2(y2 - y1, x2 - x1))
+                angles.append(math.atan2(ey - sy, ex - sx))
 
-            # append the exact endpoint for this segment
-            coords.append((x2, y2))
-            angles.append(math.atan2(y2 - y1, x2 - x1))
-            agent._node_frame_cache[n2] = len(coords) - 1  # record the frame index for node n2
+            coords.append((ex, ey))
+            angles.append(math.atan2(ey - sy, ex - sx))
+            agent._node_frame_cache[n2] = len(coords) - 1
 
-        # orient final node nicely if map has an orientation
+
+        # orient final node nicely if map has orientation
         final_angle = get_orientation_from_map(path[-1]) or (angles[-1] if angles else 0.0)
         if angles:
             angles[-1] = final_angle
 
         agent.dynamic_coords, agent.dynamic_angles = coords, angles
+
+
 
     # --- initial trails (dash intended routes)
     for idx, agent in enumerate(agents):
@@ -153,6 +182,8 @@ def animate_paths(
     # for t in trails:
     #     print(f"[Viz:init] {t['agent'].name} dynamic frames: {len(t['coords'])}")
     agent_to_trail = {t["agent"]: t for t in trails}
+    for a in agents:
+        a._last_route_index = 0
 
     replan_banner_printed = False
     first_replan_done = False
@@ -191,6 +222,25 @@ def animate_paths(
             arrow.set_positions((x, y), (x + dx, y + dy))
             artists.extend([trail["dot"], arrow])
 
+        # ---- progress tracker: advance _last_route_index as we cross nodes
+        for a in agents:
+            fr = getattr(a, "full_route", None)
+            tr = agent_to_trail.get(a)
+            if not fr or not tr or not tr["coords"]:
+                continue
+            local_i = max(0, min(frame - tr.get("start_frame", 0), len(tr["coords"]) - 1))
+            x, y = tr["coords"][local_i]
+            last_idx = getattr(a, "_last_route_index", 0)
+            j = last_idx
+            while j < len(fr):
+                nx, ny = positions[fr[j]]
+                if (x - nx) ** 2 + (y - ny) ** 2 <= reach_tol ** 2:
+                    j += 1
+                else:
+                    break
+            if j > 0:
+                a._last_route_index = max(last_idx, j - 1)
+
         # ---- detect goal reached (for nice bookkeeping)
         for a in agents:
             if getattr(a, "goal", None) and not getattr(a, "finished", False):
@@ -215,11 +265,53 @@ def animate_paths(
             x, y = tr["coords"][local_i]
             ex, ey = positions[endn]
             if (x - ex) ** 2 + (y - ey) ** 2 <= reach_tol ** 2:
-                # mark consumed so we don't re-trigger on every frame afterward
-                a.fragment_end_node = None
+                a.fragment_end_node = None  # consume once
                 fragment_completed = True
 
-        # ---- run replan if a fragment just completed (immediate)
+        # Helper: apply a resumed plan with no jumps
+        def _apply_resume(a):
+            # Current XY on screen
+            old_tr = agent_to_trail.get(a)
+            resume_xy = None
+            if old_tr and old_tr["coords"]:
+                idx_old = max(0, min(frame - old_tr.get("start_frame", 0), len(old_tr["coords"]) - 1))
+                resume_xy = old_tr["coords"][idx_old]
+
+            fr = getattr(a, "full_route", None) or []
+            if not fr:
+                a.replanned = False
+                return
+
+            # Choose start index by nearest route node to current XY, but never go backwards
+            if resume_xy is not None:
+                def d2(i):
+                    px, py = positions[fr[i]]
+                    return (px - resume_xy[0]) ** 2 + (py - resume_xy[1]) ** 2
+                nearest_idx = min(range(len(fr)), key=d2)
+            else:
+                nearest_idx = getattr(a, "_last_route_index", 0)
+
+            start_idx = max(getattr(a, "_last_route_index", 0), nearest_idx)
+
+            # Rebuild from CURRENT XY toward fr[start_idx:]
+            rebuild_dynamic_traj(
+                a, positions, get_orientation_from_map,
+                fps=fps, start_index=start_idx, resume_xy=resume_xy
+            )
+
+            # Install new trajectory & refresh dashed intended path
+            tr = agent_to_trail.get(a)
+            if tr:
+                tr["coords"] = a.dynamic_coords
+                tr["angles"] = a.dynamic_angles
+                tr["start_frame"] = frame
+                if tr.get("path_line"):
+                    xs, ys = (zip(*[positions[n] for n in fr if n in positions]) if fr else ([], []))
+                    tr["path_line"].set_data(xs, ys)
+
+            a.replanned = False  # clear flag
+
+        # ---- run replan immediately after a fragment completes
         if graph and fragment_completed:
             if not replan_banner_printed:
                 print("\n[→] Replan: fragment completed — resuming waiters if possible...\n")
@@ -239,21 +331,11 @@ def animate_paths(
                 for a in agents:
                     if getattr(a, "replanned", False):
                         print(f"[Replan] {a.name} resumed: {a.full_route}")
-                        rebuild_dynamic_traj(a, positions, get_orientation_from_map, fps=fps)
-                        tr = agent_to_trail.get(a)
-                        if tr:
-                            tr["coords"] = a.dynamic_coords
-                            tr["angles"] = a.dynamic_angles
-                            tr["start_frame"] = frame
-                            # also refresh dashed path (keep your helper if you have it)
-                            if tr.get("path_line"):
-                                xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
-                                tr["path_line"].set_data(xs, ys)
-                        a.replanned = False
+                        _apply_resume(a)
                 print("[✓] One or more waiting agents successfully replanned.\n")
-                last_poll_frame = frame  # avoid double-running this frame
+                last_poll_frame = frame
 
-        # ---- ALWAYS-ON periodic poll (so owners freeing a gate node can unlock waiters)
+        # ---- periodic poll: owners may free a gate node without a fragment finishing
         if graph and any(getattr(a, "waiting", False) for a in agents):
             if frame - last_poll_frame >= replan_poll_every:
                 last_poll_frame = frame
@@ -270,19 +352,12 @@ def animate_paths(
                     for a in agents:
                         if getattr(a, "replanned", False):
                             print(f"[Replan] {a.name} resumed: {a.full_route}")
-                            rebuild_dynamic_traj(a, positions, get_orientation_from_map, fps=fps)
-                            tr = agent_to_trail.get(a)
-                            if tr:
-                                tr["coords"] = a.dynamic_coords
-                                tr["angles"] = a.dynamic_angles
-                                tr["start_frame"] = frame
-                                if tr.get("path_line"):
-                                    xs, ys = zip(*[positions[n] for n in a.full_route if n in positions]) if a.full_route else ([], [])
-                                    tr["path_line"].set_data(xs, ys)
-                            a.replanned = False
+                            _apply_resume(a)
                     print("[✓] One or more waiting agents successfully replanned.\n")
 
         return artists
+
+
 
 
     if show_legend:
@@ -313,10 +388,16 @@ def animate_paths(
 
     fig.ani = ani  # keep a strong ref
 
+    
     if save:
-        import os
-        os.makedirs("output", exist_ok=True)
-        ani.save("output/animation.gif", writer="pillow", fps=fps)
-        print("[✓] Animation saved to output/animation.gif")
+        try:
+            os.makedirs("output", exist_ok=True)
+            out_path = os.path.abspath(os.path.join("output", "animation.gif"))
+            print(f"[i] Saving animation to {out_path} ...")
+            ani.save(out_path, writer="pillow", fps=fps)
+            print(f"[✓] Animation saved to {out_path}")
+        except Exception as e:
+            print(f"[x] Failed to save animation: {type(e).__name__}: {e}")
     else:
         plt.show()
+

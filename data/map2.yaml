@@ -19,8 +19,8 @@
       orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Park2_Start1
-        node: Start1
+      # - edge_id: Park2_Start1
+      #   node: Start1
       - edge_id: Park2_Spare1
         node: Spare1
 
@@ -41,8 +41,8 @@
       orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Park4_Start2
-        node: Start2
+      # - edge_id: Park4_Start2
+      #   node: Start2
       - edge_id: Park4_Spare2
         node: Spare2
 
@@ -67,8 +67,8 @@
     edges:
       - edge_id: Start1_Park1
         node: Park1
-      - edge_id: Start1_Park2
-        node: Park2
+      # - edge_id: Start1_Park2
+      #   node: Park2
       - edge_id: Start1_Park5
         node: Park5
       - edge_id: Start1_A1
@@ -86,8 +86,8 @@
     edges:
       - edge_id: Start2_Park3
         node: Park3
-      - edge_id: Start2_Park4
-        node: Park4
+      # - edge_id: Start2_Park4
+      #   node: Park4
       - edge_id: Start2_Park5
         node: Park5
       - edge_id: Start2_C1
@@ -147,8 +147,8 @@
     edges:
       - edge_id: D1_C1
         node: C1
-      - edge_id: D1_A2
-        node: A2         # cross-link for alternative detours
+      # - edge_id: D1_A2
+      #   node: A2         # cross-link for alternative detours
       - edge_id: D1_D2
         node: D2
 

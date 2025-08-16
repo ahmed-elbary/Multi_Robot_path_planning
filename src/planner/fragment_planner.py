@@ -99,8 +99,8 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
     for i, agent in enumerate(agents):
         print(f"\n[✓] Planning spatial route for {agent.name} from {agent.start} to {agent.goal}")
         occupied = all_starts - {agent.start}
-        for prev in agents[:i]:
-            occupied.update(prev.full_route)
+        # for prev in agents[:i]:
+        #     occupied.update(prev.full_route)
 
         filtered = graph.copy()
         for node in occupied:
@@ -114,7 +114,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
             path = nx.shortest_path(filtered, agent.start, agent.goal)
             agent.route = [(path[j], path[j + 1]) for j in range(len(path) - 1)]
             agent.full_route = path
-            agent.fragments = [agent.route]
+            agent.fragments = [agent.route.copy()]
             agent.waiting = False
             agent.wait_node = None
             agent.blocked_by_node = None
@@ -177,7 +177,7 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
             agent.blocked_constraints = []
             # ensure first fragment exists
             if getattr(agent, "route", None):
-                agent.fragments = [agent.route]
+                agent.fragments = [agent.route.copy()]
                 seg_nodes = [agent.route[0][0]] + [v for (_, v) in agent.route]
             else:
                 seg_nodes = agent.full_route
@@ -216,8 +216,8 @@ def split_critical_paths(graph: nx.Graph, agents: List[Agent], dangerous_points:
             new_frag.append((u, v))
 
         # Replace fragments/route/full_route to the safe prefix
-        agent.fragments = [new_frag] if new_frag else []
-        agent.route = new_frag
+        agent.fragments = [new_frag.copy()] if new_frag else []
+        agent.route = new_frag[:]
         agent.full_route = [agent.start] + [v for (u, v) in new_frag] if new_frag else [agent.start]
 
         # Mark waiting at last_safe and store constraints
@@ -514,29 +514,29 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         # No conflicts: accept only segments that actually move
         accepted = [by_name[nm] for nm, seg in safe_segments.items() if len(seg) >= 2]
 
-    # ---- apply releases ----
+    # -------- apply releases --------
     any_resumed = False
     if accepted:
         print("[Replan] Accepted releases this pass:")
         for a in accepted:
-            seg = safe_segments[a.name]
-
-            # Ignore no-op fragments (single-node).
+            seg = safe_segments[a.name]             # <- node list of the released segment
             if len(seg) < 2:
-                print(f"  • {a.name} → no-op fragment at {seg[-1]} (still gated); keeping waiting state")
-                if a.name in gate_hint:
-                    a.waiting = True
-                    a.blocker_owner, a.blocked_by_node = gate_hint[a.name]
-                    _log_gate(a, a.blocker_owner, a.blocked_by_node)
+                ...
                 continue
 
             frag = [(seg[j], seg[j+1]) for j in range(len(seg)-1)]
             a.fragments.append(frag)
             a.route += frag
+
+            # extend full_route without duplicating the boundary node
             if a.full_route and a.full_route[-1] == seg[0]:
                 a.full_route += seg[1:]
             else:
                 a.full_route += seg
+
+            # 👇 add this line so the visualiser knows the resume anchor
+            a.last_released_seg = seg[:]            # <— NEW
+
             a.replanned = True
             a.waiting = False
             a.blocked_by_node = None
