@@ -207,6 +207,12 @@ def animate_paths(
 
         artists = []
 
+        # accumulate waiting time per agent (in frames)
+        for a in agents:
+            if getattr(a, "waiting", False):
+                a.wait_frames = getattr(a, "wait_frames", 0) + 1
+        
+
         # ---- draw agents (reuse one arrow per agent)
         for trail in trails:
             if not trail["coords"]:
@@ -251,6 +257,8 @@ def animate_paths(
                     x, y = tr["coords"][local_i]
                     if (x - gx) ** 2 + (y - gy) ** 2 <= reach_tol ** 2:
                         a.finished = True
+                        if not hasattr(a, "finished_frame"):
+                            a.finished_frame = frame
 
         # ---- trigger replan when ANY agent completes its current fragment
         fragment_completed = False

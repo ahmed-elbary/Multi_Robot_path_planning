@@ -3,6 +3,7 @@ import math
 from typing import List, Dict, Tuple, Optional
 import networkx as nx
 from .agent import Agent
+from utils import path_length
 
 
 # =============================== small helpers ===============================
@@ -99,8 +100,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
     for i, agent in enumerate(agents):
         print(f"\n[✓] Planning spatial route for {agent.name} from {agent.start} to {agent.goal}")
         occupied = all_starts - {agent.start}
-        # for prev in agents[:i]:
-        #     occupied.update(prev.full_route)
+
 
         filtered = graph.copy()
         for node in occupied:
@@ -111,7 +111,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
         print(f"[✓] Filtered map for {agent.name} — Occupied nodes removed: {sorted(list(occupied))}")
 
         try:
-            path = nx.shortest_path(filtered, agent.start, agent.goal)
+            path = nx.shortest_path(filtered, agent.start, agent.goal, weight="weight")
             agent.route = [(path[j], path[j + 1]) for j in range(len(path) - 1)]
             agent.full_route = path
             agent.fragments = [agent.route.copy()]
@@ -120,6 +120,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
             agent.blocked_by_node = None
             agent.blocker_owner = None
             agent.resume_ready = False
+            agent.initial_len = path_length(path, graph)
             print(f"[{agent.name}] Planned path: {path}")
         except nx.NetworkXNoPath:
             agent.route = []
@@ -282,6 +283,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         if getattr(agent, "_gate_state", None) != key:
             print(f"[i] {agent.name} gated by {owner_name} at {gate_node}")
             agent._gate_state = key
+            agent.gates = getattr(agent, "gates", 0) + 1
 
     def first_frame_at_node(blocker: Agent, node: str) -> Optional[int]:
         """Find the first animation frame where 'blocker' reaches 'node' (within tolerance)."""
@@ -411,7 +413,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             dst = getattr(a, "goal", None)
             if src not in Gf or dst not in Gf:
                 raise nx.NodeNotFound
-            p = nx.shortest_path(Gf, src, dst)
+            p = nx.shortest_path(Gf, src, dst, weight="weight")
             full_candidates[a.name] = p
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             pass
@@ -469,6 +471,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         for name, hint in gate_hint.items():
             ag = by_name[name]
             _log_gate(ag, hint[0], hint[1])
+
         if verbose_snapshots:
             _print_safepoints_snapshot()
         return False
@@ -521,7 +524,6 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         for a in accepted:
             seg = safe_segments[a.name]             # <- node list of the released segment
             if len(seg) < 2:
-                ...
                 continue
 
             frag = [(seg[j], seg[j+1]) for j in range(len(seg)-1)]
@@ -536,6 +538,8 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
 
             # 👇 add this line so the visualiser knows the resume anchor
             a.last_released_seg = seg[:]            # <— NEW
+
+            a.replans = getattr(a, "replans", 0) + 1
 
             a.replanned = True
             a.waiting = False
@@ -553,6 +557,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
             ag.waiting = True
             ag.blocker_owner, ag.blocked_by_node = hint
             _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
+        
 
         if verbose_snapshots:
             _print_safepoints_snapshot()
@@ -564,6 +569,7 @@ def replan_waiting_agents(agents: List[Agent], graph: nx.Graph, **kwargs) -> boo
         ag.waiting = True
         ag.blocker_owner, ag.blocked_by_node = hint
         _log_gate(ag, ag.blocker_owner, ag.blocked_by_node)
+
 
     if verbose_snapshots:
         _print_safepoints_snapshot()

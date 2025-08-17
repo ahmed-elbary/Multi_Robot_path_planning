@@ -570,7 +570,7 @@ if __name__ == "__main__":
         Agent("Robot1", "Park1", "T01"),
         Agent("Robot2", "Park2", "T52"),
         Agent("Robot3", "Park3", "T00"),
-        Agent("Robot4", "Spare2", "T51"),
+        # Agent("Robot4", "Spare2", "T51"),
 
     ]
     planner = FragmentPlanner(yaml_file, agents)

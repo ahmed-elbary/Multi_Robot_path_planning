@@ -9,6 +9,11 @@ from planner.fragment_planner import (
 )
 from utils import load_map, build_graph_from_yaml
 from planner.visualiser import animate_paths
+from planner.metrics import collect_metrics, print_metrics
+from utils import print_eval_summary
+
+
+
 
 
 def parse_args():
@@ -25,9 +30,9 @@ def parse_args():
 # ====================== choose a test set ======================
 def create_agents() -> list:
     return [
-        Agent("Robot1", "T10", "T20"),
-        Agent("Robot2", "T23", "T33"),
-        Agent("Robot3", "T32", "T11"),
+        Agent("Robot1", "Park1", "T11"),
+        Agent("Robot2", "Spare2", "Park2"),
+        Agent("Robot3", "Park3", "T33"),
         Agent("Robot4", "T41", "T52"),
         Agent("Robot5", "T53", "T40"),
        
@@ -36,11 +41,11 @@ def create_agents() -> list:
 
 # def create_agents() -> list:
 #     return [
-#         Agent("Robot1", "Park1", "Start2"),
-#         Agent("Robot2", "Park2", "D3"),
-#         Agent("Robot3", "Park3", "C2"),
-#         Agent("Robot4", "Park4", "A1"),
-#         Agent("Robot5", "Park5", "B1"),
+#         Agent("Robot1", "Park1", "D2"),
+#         Agent("Robot2", "Start2", "Start2"),
+#         Agent("Robot3", "C1", "C1"),
+#         Agent("Robot4", "A1", "Park1"),
+#         Agent("Robot5", "Park5", "Park5"),
 #     ]
 
 # def create_agents() -> list:
@@ -131,6 +136,8 @@ def main():
         )
 
         print_summary(agents, "\n==== After Animation ====")
+        print_eval_summary(agents, graph, fps=args.fps)
+
         return
 
     # ===== 5) Terminal mode (no --animate) =====
@@ -215,6 +222,11 @@ def main():
         run_cascade({owner.name}, label=owner.name)
 
     print_summary(agents, "\n==== Final Summary ====")
+    print_eval_summary(agents, graph, fps=args.fps)
+
+
+
+
 
 
 if __name__ == "__main__":
