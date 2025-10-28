@@ -11,6 +11,18 @@ except ImportError:
     from planner.fragment_planner import replan_waiting_agents
 
 
+def _iter_node_entries(topo_map):
+    """Return an iterable of node entries for both schemas:
+       - small maps: a list of {node:{...}} or { ... } per entry
+       - big maps : a dict with key 'nodes' holding that list
+    """
+    return topo_map.get("nodes", topo_map) if isinstance(topo_map, dict) else topo_map
+
+def _node_dict(entry):
+    """Return the node dict from an entry that may be {node:{...}} or already {...}."""
+    return entry.get("node", entry)
+
+
 def animate_paths(
     agents,
     positions,
@@ -31,24 +43,32 @@ def animate_paths(
     ax.axis("equal")
     ax.grid(False)
 
-    # --- draw map
-    for entry in topo_map:
-        node = entry["node"]
-        name = node["name"]
+    # ---- draw map (keep baseline look)
+    for entry in _iter_node_entries(topo_map):
+        node = _node_dict(entry)
+        name = node.get("name")
+        if name not in positions:
+            continue  # skip nodes not present in the graph/positions
+
         x, y = positions[name]
         ax.scatter(x, y, c="blue", zorder=1)
         ax.text(x + 0.1, y - 0.1, name, fontsize=9)
-        for edge in node.get("edges", []):
-            to_node = edge["node"]
-            if to_node in positions:
-                x2, y2 = positions[to_node]
-                ax.plot([x, x2], [y, y2], color="gray", linewidth=1, zorder=1)
-                dx, dy = x2 - x, y2 - y
-                ax.add_patch(FancyArrowPatch(
+
+        for edge in (node.get("edges") or []):
+            to_node = edge.get("node")
+            if not to_node or to_node not in positions:
+                continue
+            x2, y2 = positions[to_node]
+            ax.plot([x, x2], [y, y2], color="gray", linewidth=1, zorder=1)
+            dx, dy = x2 - x, y2 - y
+            ax.add_patch(
+                FancyArrowPatch(
                     (x + 0.25 * dx, y + 0.25 * dy),
                     (x + 0.30 * dx, y + 0.30 * dy),
                     arrowstyle="-|>", mutation_scale=15, color="gray", zorder=1
-                ))
+                )
+            )
+
 
     colors = ["red", "blue", "green", "orange", "purple", "brown", "magenta", "teal"]
     trails, max_frames = [], 0
@@ -390,7 +410,7 @@ def animate_paths(
 
     ani = animation.FuncAnimation(
         fig, update,
-        frames=max(1, int(180 * fps)),   # ~3 minutes of animation time
+        frames=max(1, int(65 * fps)),   # ~3 minutes of animation time
         interval=100, blit=False, repeat=False, init_func=init,
     )
 
@@ -400,7 +420,7 @@ def animate_paths(
     if save:
         try:
             os.makedirs("output", exist_ok=True)
-            out_path = os.path.abspath(os.path.join("output", "animation.gif"))
+            out_path = os.path.abspath(os.path.join("output", "fragment_planner-0.gif"))
             print(f"[i] Saving animation to {out_path} ...")
             ani.save(out_path, writer="pillow", fps=fps)
             print(f"[✓] Animation saved to {out_path}")

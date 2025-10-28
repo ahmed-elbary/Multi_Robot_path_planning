@@ -9,8 +9,9 @@ from planner.fragment_planner import (
 )
 from utils import load_map, build_graph_from_yaml
 from planner.visualiser import animate_paths
-from planner.metrics import collect_metrics, print_metrics
-from utils import print_eval_summary
+from metrics import collect_metrics, print_metrics, append_run_to_csv
+from typing import List
+
 
 
 
@@ -24,38 +25,70 @@ def parse_args():
     parser.add_argument('--fps', type=int, default=10, help='Animation FPS')
     parser.add_argument('--save', action='store_true', help='Save animation to file (uses default name)')
     parser.add_argument('--quiet', action='store_true', help='Reduce replanning logs/snapshots')
+    parser.add_argument('--dump_csv', type=str, default=None, help='Append metrics (global + per-agent) to this CSV after the run')
+
     return parser.parse_args()
 
 
 # ====================== choose a test set ======================
-def create_agents() -> list:
+## For map.yaml
+def create_agents() -> List[Agent]:
+    """
+    Define initial agents and goals. Adjust to force/avoid conflicts.
+    For real experiments, move scenarios into a separate module or YAML.
+    """
     return [
-        Agent("Robot1", "Park1", "T11"),
-        Agent("Robot2", "Spare2", "Park2"),
-        Agent("Robot3", "Park3", "T33"),
-        Agent("Robot4", "T41", "T52"),
-        Agent("Robot5", "T53", "T40"),
-       
+        Agent("Robot1", "Park1", "T31"),
+        Agent("Robot2", "Park2", "T53"),
+        Agent("Robot3", "T53", "T40"),
+#         Agent("Robot4", "T42", "T01"),
+#         Agent("Robot5", "T01", "T42"),
+
+#     ]
+
+# For map_bigger.yaml
+# def create_agents() -> List[Agent]:
+#     """
+#     Define initial agents and goals. Adjust to force/avoid conflicts.
+#     For real experiments, move scenarios into a separate module or YAML.
+#     """
+#     return [
+        # Agent("Robot1", "Park1", "T27"),
+        # Agent("Robot2", "Park2", "T36"),
+        # Agent("Robot3", "Park3", "T61"),
+        # Agent("Robot4", "Park4", "T51"),
+        # Agent("Robot5", "Park5", "T74"),
+        # Agent("Robot6", "Park6", "T79"),
+
+        # Agent("Robot1", "T35", "T27"),
+        # Agent("Robot2", "Park2", "T36"),
+        # Agent("Robot3", "T78", "T61"),
+        # Agent("Robot4", "T42", "T51"),
+        # Agent("Robot5", "T62", "T74"),
+        # Agent("Robot6", "Park6", "T65"),
     ]
 
-
-# def create_agents() -> list:
+## For map2.yaml
+# def create_agents() -> list[Agent]:
 #     return [
-#         Agent("Robot1", "Park1", "D2"),
-#         Agent("Robot2", "Start2", "Start2"),
-#         Agent("Robot3", "C1", "C1"),
-#         Agent("Robot4", "A1", "Park1"),
-#         Agent("Robot5", "Park5", "Park5"),
+#         Agent("Robot1", "dock-0", "r5.7-ca"),
+#         Agent("Robot2", "dock-1", "r6.5-c0"),
+#         Agent("Robot3", "r7.5-c3", "r6.5-c3"),
+#         Agent("Robot4", "r3.5-c0", "r5.7-c1"),
+#         Agent("Robot5", "r10.3-ca", "r1.5-c1"),
+#         Agent("Robot6", "r8.5-c1", "r9.5-c0"),
+#         Agent("Robot7", "r1.5-c3", "r3.5-c3"),
 #     ]
 
-# def create_agents() -> list:
+## For map3.yaml
+# def create_agents() -> list[Agent]:
 #     return [
-#         Agent("Robot1", "Park1", "W"),
-#         Agent("Robot2", "Park2", "S"),
-#         Agent("Robot3", "Park3", "N"),
-#         Agent("Robot4", "Park4", "E"),
-#         Agent("Robot5", "Park5", "NE"),
+#         Agent("Robot1", "Park1", "A7"),
+#         Agent("Robot2", "Park2", "B2"),
+#         Agent("Robot3", "Park3", "C1"),
+
 #     ]
+
 # ===============================================================
 
 
@@ -114,13 +147,15 @@ def main():
         positions = {node: tuple(data['pos']) for node, data in graph.nodes(data=True)}
 
         def get_orientation_from_map(node_name):
-            # Pull yaw from the YAML map (z,w quaternion → yaw)
-            for entry in map_data:
-                if entry['node']['name'] == node_name:
-                    q = entry['node']['pose']['orientation']
-                    z, w = q['z'], q['w']
+            entries = map_data.get("nodes", []) if isinstance(map_data, dict) else map_data
+            for entry in entries:
+                node = entry.get("node", entry)
+                if node.get("name") == node_name:
+                    q = node.get("pose", {}).get("orientation", {})
+                    z = float(q.get("z", 0.0)); w = float(q.get("w", 1.0))
                     return math.atan2(2.0 * w * z, 1.0 - 2.0 * (z ** 2))
             return None
+
 
         print("\n[✓] Launching animation...")
         animate_paths(
@@ -136,7 +171,18 @@ def main():
         )
 
         print_summary(agents, "\n==== After Animation ====")
-        print_eval_summary(agents, graph, fps=args.fps)
+        report = collect_metrics(agents, graph, fps=args.fps)
+        print_metrics(report, fps=args.fps)
+
+        if args.dump_csv:
+            meta = {
+                "map_id": args.map,
+                "planner": "fragment_planner",
+                "n_agents": len(agents),
+            }
+            out_path = append_run_to_csv(report, args.dump_csv, meta, agents)
+            print(f"[✓] Appended metrics to {out_path}")
+
 
         return
 
@@ -222,10 +268,8 @@ def main():
         run_cascade({owner.name}, label=owner.name)
 
     print_summary(agents, "\n==== Final Summary ====")
-    print_eval_summary(agents, graph, fps=args.fps)
-
-
-
+    report = collect_metrics(agents, graph, fps=args.fps)
+    print_metrics(report, fps=args.fps)
 
 
 

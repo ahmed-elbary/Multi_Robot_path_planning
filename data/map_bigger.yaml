@@ -1,0 +1,1249 @@
+# This file defines the 8 x 25 sized map for the multi-robot path planning simulation.
+# It includes 105 nodes representing various locations and their poses, as well as edges connecting these nodes.
+# The nodes are categorized into different sections such as parking areas, tunnel rows, and spare nodes.
+# Each node has a name, pose (position and orientation), and Directed edges that connect it to other nodes.
+# The pose is defined in a 3D space with x, y, z coordinates and orientation represented by a quaternion.
+# The map is structured to facilitate path planning and visualization in the simulation environment.
+
+# Parking area (6 nodes)
+- node:
+    name:  Park1
+    pose:
+      position: {x: 0.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park1_S1
+        node: S1
+
+
+- node:
+    name: Park2
+    pose:
+      position: {x: 1.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+
+      - edge_id: Park2_S1
+        node: S1
+
+
+- node:
+    name: Park3
+    pose:
+      position: {x: 3.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park3_S2
+        node: S2
+
+
+- node:
+    name:  Park4
+    pose:
+      position: {x: 4.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park4_S2
+        node: S2
+
+
+- node:
+    name: Park5
+    pose:
+      position: {x: 6.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park5_S3
+        node: S3
+
+
+- node:
+    name: Park6
+    pose:
+      position: {x: 7.5, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park6_S3
+        node: S3
+
+
+# Setup area (3 nodes)
+- node:
+    name: S1
+    pose:
+      position: {x: 1, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: S1_Park1
+        node: Park1
+      - edge_id: S1_Park2
+        node: Park2
+      - edge_id: S1_S2
+        node: S2
+      - edge_id: S1_Start1
+        node: Start1
+
+
+- node:
+    name: S2
+    pose:
+      position: {x: 4, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: S2_S3
+        node: S3
+      - edge_id: S2_Start2
+        node: Start2
+      - edge_id: S2_Park3
+        node: Park3
+      - edge_id: S2_Park4
+        node: Park4
+
+- node:
+    name: S3
+    pose:
+      position: {x: 7, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: S3_Start3
+        node: Start3
+      - edge_id: S3_Park5
+        node: Park5
+      - edge_id: S3_Park6
+        node: Park6
+
+# Start nodes (3 nodes)
+- node:
+    name: Start1
+    pose:
+      position: {x: 1.0, y: 1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Start1_T00
+        node: T00
+      - edge_id: Start1_T10
+        node: T10
+      - edge_id: Start1_T20
+        node: T20
+      - edge_id: Start1_S1
+        node: S1
+
+- node:
+    name: Start2
+    pose:
+      position: {x: 4.0, y: 1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+
+      - edge_id: Start2_T30
+        node: T30
+      - edge_id: Start2_T40
+        node: T40
+      - edge_id: Start2_T50
+        node: T50
+      - edge_id: Start2_Start1
+        node: Start1
+      - edge_id: Start2_S2
+        node: S2
+
+
+- node:
+    name: Start3
+    pose:
+      position: {x: 7.0, y: 1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: Start3_T60
+        node: T60
+      - edge_id: Start3_T70
+        node: T70
+      - edge_id: Start3_T80
+        node: T80
+      - edge_id: Start3_T90
+        node: T90
+      - edge_id: Start3_Start2
+        node: Start2
+      - edge_id: Start3_S3
+        node: S3
+
+# Tunnel rows (9 rows × 10 columns = 90 nodes)
+
+# ---------------- Row T0 ----------------
+- node:
+    name: T00
+    pose:
+      position: {x: 0.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T00_T01
+        node: T01
+      - edge_id: T00_Start1
+        node: Start1
+
+- node:
+    name: T01
+    pose:
+      position: {x: 0.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T01_T02
+        node: T02
+      - edge_id: T01_T00
+        node: T00
+
+- node:
+    name: T02
+    pose:
+      position: {x: 0.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T02_T03
+        node: T03
+      - edge_id: T02_T01
+        node: T01
+
+- node:
+    name: T03
+    pose:
+      position: {x: 0.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T03_T02
+        node: T02
+      - edge_id: T03_T04
+        node: T04
+
+- node:
+    name: T04
+    pose:
+      position: {x: 0.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T04_T03
+        node: T03
+      - edge_id: T04_T05
+        node: T05
+
+- node:
+    name: T05
+    pose:
+      position: {x: 0.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T05_T04
+        node: T04
+      - edge_id: T05_T06
+        node: T06
+
+- node:
+    name: T06
+    pose:
+      position: {x: 0.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T06_T05
+        node: T05
+      - edge_id: T06_T07
+        node: T07
+
+- node:
+    name: T07
+    pose:
+      position: {x: 0.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T07_T06
+        node: T06
+      - edge_id: T07_T08
+        node: T08
+
+- node:
+    name: T08
+    pose:
+      position: {x: 0.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T08_T07
+        node: T07
+      - edge_id: T08_T09
+        node: T09
+
+- node:
+    name: T09
+    pose:
+      position: {x: 0.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T09_T08
+        node: T08
+      - edge_id: T09_Spare1
+        node: Spare1
+
+# ---------------- Row T1 ----------------
+- node:
+    name: T10
+    pose:
+      position: {x: 1.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T10_T11
+        node: T11
+      - edge_id: T10_Start1
+        node: Start1
+
+- node:
+    name: T11
+    pose:
+      position: {x: 1.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T11_T12
+        node: T12
+      - edge_id: T11_T10
+        node: T10
+
+- node:
+    name: T12
+    pose:
+      position: {x: 1.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T12_T13
+        node: T13
+      - edge_id: T12_T11
+        node: T11
+
+- node:
+    name: T13
+    pose:
+      position: {x: 1.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T13_T12
+        node: T12
+      - edge_id: T13_T14
+        node: T14
+
+- node:
+    name: T14
+    pose:
+      position: {x: 1.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T14_T13
+        node: T13
+      - edge_id: T14_T15
+        node: T15
+
+- node:
+    name: T15
+    pose:
+      position: {x: 1.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T15_T14
+        node: T14
+      - edge_id: T15_T16
+        node: T16
+
+- node:
+    name: T16
+    pose:
+      position: {x: 1.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T16_T15
+        node: T15
+      - edge_id: T16_T17
+        node: T17
+
+- node:
+    name: T17
+    pose:
+      position: {x: 1.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T17_T16
+        node: T16
+      - edge_id: T17_T18
+        node: T18
+
+- node:
+    name: T18
+    pose:
+      position: {x: 1.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T18_T17
+        node: T17
+      - edge_id: T18_T19
+        node: T19
+
+- node:
+    name: T19
+    pose:
+      position: {x: 1.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T19_T18
+        node: T18
+      - edge_id: T19_Spare1
+        node: Spare1
+
+# ---------------- Row T2 ----------------
+- node:
+    name: T20
+    pose:
+      position: {x: 2.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T20_T21
+        node: T21
+      - edge_id: T20_Start1
+        node: Start1
+      
+- node:
+    name: T21
+    pose:
+      position: {x: 2.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T21_T22
+        node: T22
+      - edge_id: T21_T20
+        node: T20
+
+- node:
+    name: T22
+    pose:
+      position: {x: 2.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T22_T23
+        node: T23
+      - edge_id: T22_T21
+        node: T21
+
+- node:
+    name: T23
+    pose:
+      position: {x: 2.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T23_T22
+        node: T22
+      - edge_id: T23_T24
+        node: T24
+
+- node:
+    name: T24
+    pose:
+      position: {x: 2.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T24_T23
+        node: T23
+      - edge_id: T24_T25
+        node: T25
+
+- node:
+    name: T25
+    pose:
+      position: {x: 2.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T25_T24
+        node: T24
+      - edge_id: T25_T26
+        node: T26
+
+- node:
+    name: T26
+    pose:
+      position: {x: 2.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T26_T25
+        node: T25
+      - edge_id: T26_T27
+        node: T27
+
+- node:
+    name: T27
+    pose:
+      position: {x: 2.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T27_T26
+        node: T26
+      - edge_id: T27_T28
+        node: T28
+
+- node:
+    name: T28
+    pose:
+      position: {x: 2.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T28_T27
+        node: T27
+      - edge_id: T28_T29
+        node: T29
+
+- node:
+    name: T29
+    pose:
+      position: {x: 2.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T29_T28
+        node: T28
+      - edge_id: T29_Spare1
+        node: Spare1    
+
+- node:
+    name: T30
+    pose:
+      position: {x: 3.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T30_T31
+        node: T31
+      - edge_id: T30_Start2
+        node: Start2
+
+# ---------------- Row T3 ----------------
+- node:
+    name: T31
+    pose:
+      position: {x: 3.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T31_T32
+        node: T32
+      - edge_id: T31_T30
+        node: T30
+
+- node:
+    name: T32
+    pose:
+      position: {x: 3.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T32_T33
+        node: T33
+      - edge_id: T32_T31
+        node: T31
+
+- node:
+    name: T33
+    pose:
+      position: {x: 3.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T33_T32
+        node: T32
+      - edge_id: T33_T34
+        node: T34
+
+- node:
+    name: T34
+    pose:
+      position: {x: 3.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T34_T33
+        node: T33
+      - edge_id: T34_T35
+        node: T35
+
+- node:
+    name: T35
+    pose:
+      position: {x: 3.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T35_T34
+        node: T34
+      - edge_id: T35_T36
+        node: T36
+
+- node:
+    name: T36
+    pose:
+      position: {x: 3.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T36_T35  
+        node: T35
+      - edge_id: T36_T37
+        node: T37
+
+- node:
+    name: T37
+    pose:
+      position: {x: 3.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T37_T36
+        node: T36
+      - edge_id: T37_T38
+        node: T38
+
+- node:
+    name: T38
+    pose:
+      position: {x: 3.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T38_T37
+        node: T37
+      - edge_id: T38_T39
+        node: T39
+
+- node:
+    name: T39
+    pose:
+      position: {x: 3.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T39_T38
+        node: T38
+      - edge_id: T39_Spare2
+        node: Spare2
+
+# ---------------- Row T4 ----------------
+- node:
+    name: T40
+    pose:
+      position: {x: 4.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T40_T41
+        node: T41
+      - edge_id: T40_Start2
+        node: Start2
+
+- node:
+    name: T41
+    pose:
+      position: {x: 4.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T41_T42
+        node: T42
+      - edge_id: T41_T40
+        node: T40
+
+- node:
+    name: T42
+    pose:
+      position: {x: 4.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T42_T43
+        node: T43
+      - edge_id: T42_T41
+        node: T41
+
+- node:
+    name: T43
+    pose:
+      position: {x: 4.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T43_T42
+        node: T42
+      - edge_id: T43_T44
+        node: T44
+
+- node:
+    name: T44
+    pose:
+      position: {x: 4.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T44_T43
+        node: T43
+      - edge_id: T44_T45
+        node: T45
+
+- node:
+    name: T45
+    pose:
+      position: {x: 4.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T45_T44
+        node: T44
+      - edge_id: T45_T46
+        node: T46
+
+- node:
+    name: T46
+    pose:
+      position: {x: 4.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T46_T45
+        node: T45
+      - edge_id: T46_T47
+        node: T47
+
+- node:
+    name: T47
+    pose:
+      position: {x: 4.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T47_T46
+        node: T46
+      - edge_id: T47_T48
+        node: T48
+
+- node:
+    name: T48
+    pose:
+      position: {x: 4.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T48_T47
+        node: T47
+      - edge_id: T48_T49
+        node: T49
+
+- node:
+    name: T49
+    pose:
+      position: {x: 4.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T49_T48
+        node: T48
+      - edge_id: T49_Spare2
+        node: Spare2
+
+# ---------------- Row T5 ----------------
+- node:
+    name: T50
+    pose:
+      position: {x: 5.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T50_T51
+        node: T51
+      - edge_id: T50_Start2
+        node: Start2
+
+- node:
+    name: T51
+    pose:
+      position: {x: 5.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T51_T52
+        node: T52
+      - edge_id: T51_T50
+        node: T50
+
+- node:
+    name: T52
+    pose:
+      position: {x: 5.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T52_T53
+        node: T53
+      - edge_id: T52_T51
+        node: T51
+
+- node:
+    name: T53
+    pose:
+      position: {x: 5.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+
+    edges:
+      - edge_id: T53_T52
+        node: T52
+      - edge_id: T53_T54
+        node: T54
+
+- node:
+    name: T54
+    pose:
+      position: {x: 5.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T54_T53
+        node: T53
+      - edge_id: T54_T55
+        node: T55
+
+- node:
+    name: T55
+    pose:
+      position: {x: 5.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T55_T54
+        node: T54
+      - edge_id: T55_T56
+        node: T56
+
+- node:
+    name: T56
+    pose:
+      position: {x: 5.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T56_T55
+        node: T55
+      - edge_id: T56_T57
+        node: T57
+
+- node:
+    name: T57
+    pose:
+      position: {x: 5.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T57_T56
+        node: T56
+      - edge_id: T57_T58
+        node: T58
+
+- node:
+    name: T58
+    pose:
+      position: {x: 5.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T58_T57
+        node: T57
+      - edge_id: T58_T59
+        node: T59
+
+- node:
+    name: T59
+    pose:
+      position: {x: 5.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T59_T58
+        node: T58
+      - edge_id: T59_Spare2
+        node: Spare2
+
+# ---------------- Row T6 ----------------
+- node: 
+    name: T60
+    pose:
+      position: {x: 6.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T60_T61
+        node: T61
+      - edge_id: T60_Start3
+        node: Start3
+
+- node:
+    name: T61
+    pose:
+      position: {x: 6.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T61_T62
+        node: T62
+      - edge_id: T61_T60
+        node: T60
+
+- node:
+    name: T62
+    pose:
+      position: {x: 6.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T62_T63
+        node: T63
+      - edge_id: T62_T61
+        node: T61
+
+- node:
+    name: T63
+    pose:
+      position: {x: 6.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T63_T62
+        node: T62
+      - edge_id: T63_T64
+        node: T64
+
+- node:
+    name: T64
+    pose:
+      position: {x: 6.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T64_T63
+        node: T63
+      - edge_id: T64_T65
+        node: T65
+
+- node:
+    name: T65
+    pose:
+      position: {x: 6.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T65_T64
+        node: T64
+      - edge_id: T65_T66
+        node: T66
+
+- node:
+    name: T66
+    pose:
+      position: {x: 6.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T66_T65
+        node: T65
+      - edge_id: T66_T67
+        node: T67
+
+- node:
+    name: T67
+    pose:
+      position: {x: 6.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T67_T66
+        node: T66
+      - edge_id: T67_T68
+        node: T68
+
+- node:
+    name: T68
+    pose:
+      position: {x: 6.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T68_T67
+        node: T67
+      - edge_id: T68_T69
+        node: T69
+
+- node:
+    name: T69
+    pose:
+      position: {x: 6.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T69_T68
+        node: T68
+      - edge_id: T69_Spare3
+        node: Spare3
+
+# ---------------- Row T7 ----------------
+- node: 
+    name: T70
+    pose:
+      position: {x: 7.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T70_T71
+        node: T71
+      - edge_id: T70_Start3
+        node: Start3
+
+- node:
+    name: T71
+    pose:
+      position: {x: 7.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T71_T72
+        node: T72
+      - edge_id: T71_T70
+        node: T70
+
+- node:
+    name: T72
+    pose:
+      position: {x: 7.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T72_T73
+        node: T73
+      - edge_id: T72_T71
+        node: T71
+
+- node:
+    name: T73
+    pose:
+      position: {x: 7.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T73_T74
+        node: T74
+      - edge_id: T73_T72
+        node: T72
+
+- node:
+    name: T74
+    pose:
+      position: {x: 7.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T74_T73
+        node: T73
+      - edge_id: T74_T75
+        node: T75
+
+- node:
+    name: T75
+    pose:
+      position: {x: 7.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T75_T74
+        node: T74
+      - edge_id: T75_T76
+        node: T76
+
+- node:
+    name: T76
+    pose:
+      position: {x: 7.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T76_T75
+        node: T75
+      - edge_id: T76_T77
+        node: T77
+
+- node:
+    name: T77
+    pose:
+      position: {x: 7.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T77_T76
+        node: T76
+      - edge_id: T77_T78
+        node: T78
+
+- node:
+    name: T78
+    pose:
+      position: {x: 7.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T78_T77
+        node: T77
+      - edge_id: T78_T79
+        node: T79
+
+- node:
+    name: T79
+    pose:
+      position: {x: 7.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T79_T78
+        node: T78
+      - edge_id: T79_Spare3
+        node: Spare3
+
+# ---------------- Row T8 ----------------
+
+- node:
+    name: T80
+    pose:
+      position: {x: 8.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T80_T81
+        node: T81
+      - edge_id: T80_Start3
+        node: Start3
+
+- node:
+    name: T81
+    pose:
+      position: {x: 8.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T81_T82
+        node: T82
+      - edge_id: T81_T80
+        node: T80
+
+- node:
+    name: T82
+    pose:
+      position: {x: 8.0, y: 7.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T82_T83
+        node: T83
+      - edge_id: T82_T81
+        node: T81
+
+- node:
+    name: T83
+    pose:
+      position: {x: 8.0, y: 9.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T83_T84
+        node: T84
+      - edge_id: T83_T82
+        node: T82
+
+- node:
+    name: T84
+    pose:
+      position: {x: 8.0, y: 11.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T84_T83
+        node: T83
+      - edge_id: T84_T85
+        node: T85
+
+- node:
+    name: T85
+    pose:
+      position: {x: 8.0, y: 13.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T85_T84
+        node: T84
+      - edge_id: T85_T86
+        node: T86
+
+- node:
+    name: T86
+    pose:
+      position: {x: 8.0, y: 15.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T86_T85
+        node: T85
+      - edge_id: T86_T87
+        node: T87
+
+- node:
+    name: T87
+    pose:
+      position: {x: 8.0, y: 17.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T87_T86
+        node: T86
+      - edge_id: T87_T88
+        node: T88
+
+- node:
+    name: T88
+    pose:
+      position: {x: 8.0, y: 19.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T88_T87
+        node: T87
+      - edge_id: T88_T89
+        node: T89
+
+- node:
+    name: T89
+    pose:
+      position: {x: 8.0, y: 21.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+    edges:
+      - edge_id: T89_T88
+        node: T88
+      - edge_id: T89_Spare3
+        node: Spare3
+
+
+
+
+
+# Spare nodes (3 nodes)
+- node:
+    name: Spare1
+    pose:
+      position: {x: 1.0, y: 23.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Spare1_Spare2
+        node: Spare2
+      - edge_id: Spare1_T09
+        node: T09
+      - edge_id: Spare1_T19
+        node: T19
+      - edge_id: Spare1_T29
+        node: T29
+
+- node:
+    name: Spare2
+    pose:
+      position: {x: 4.0, y: 23.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Spare2_Spare1
+        node: Spare1
+      - edge_id: Spare2_Spare3
+        node: Spare3
+
+- node: 
+    name: Spare3
+    pose:
+      position: {x: 7.0, y: 23.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Spare3_T69
+        node: T69
+      - edge_id: Spare3_T79
+        node: T79
+      - edge_id: Spare3_T89
+        node: T89
+      - edge_id: Spare3_Spare2
+        node: Spare2

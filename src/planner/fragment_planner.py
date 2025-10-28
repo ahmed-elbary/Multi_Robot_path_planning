@@ -3,7 +3,7 @@ import math
 from typing import List, Dict, Tuple, Optional
 import networkx as nx
 from .agent import Agent
-from utils import path_length
+# from utils import path_length
 
 
 # =============================== small helpers ===============================
@@ -120,7 +120,7 @@ def find_routes(agents: List[Agent], graph: nx.Graph):
             agent.blocked_by_node = None
             agent.blocker_owner = None
             agent.resume_ready = False
-            agent.initial_len = path_length(path, graph)
+            # agent.initial_len = path_length(path, graph)
             print(f"[{agent.name}] Planned path: {path}")
         except nx.NetworkXNoPath:
             agent.route = []

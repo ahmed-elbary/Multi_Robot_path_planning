@@ -1,0 +1,49 @@
+flowchart LR
+
+  %% Nodes
+  A[YAML Map]
+  B[Map Loader & Graph Builder]
+  C[Directed Topological Graph]
+  S[Start-Goal Set]
+
+  E["Fragment Planner
+  (space-aware)"]
+  F["Space-Time Planner
+  (time-aware,
+  with reservation logic)"]
+
+  V1["Visualiser (Fragment)"]
+  V2["Visualiser (Space-Time)"]
+
+  L[CSV Logs]
+  M["Metrics & Plots"]
+
+  %% Edges
+  A --> B --> C
+  C --> E
+  C --> F
+  S --> E
+  S --> F
+  E --> V1
+  F --> V2
+  E --> L
+  F --> L
+  L --> M
+
+
+  %% Optional grouping (uncomment if you like subgraphs)
+  %% subgraph Ingestion
+  %%   direction LR
+  %%   A --> B --> C
+  %% end
+  %% subgraph Planning
+  %%   direction LR
+  %%   E
+  %%   F
+  %% end
+  %% subgraph Visualisation & Analysis
+  %%   direction LR
+  %%   V1
+  %%   V2
+  %%   L --> M
+  %% end

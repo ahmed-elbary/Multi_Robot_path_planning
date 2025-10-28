@@ -81,6 +81,6 @@ def plot_topological_map(top_map):
 
 
 if __name__ == '__main__':
-    yaml_file = os.path.join(".", "data", "map3.yaml")
+    yaml_file = os.path.join(".", "data", "map.yaml")
     top_map = load_topological_map(yaml_file)
     plot_topological_map(top_map)
