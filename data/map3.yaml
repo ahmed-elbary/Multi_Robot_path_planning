@@ -1,281 +1,341 @@
-# Open Plaza map (18 nodes): 5 Parks, 2 Starts, 1 Plaza, 4 Ring nodes, 4 Corners, 2 Spares
-# All edges are directed; most are paired to behave bidirectionally.
+# =========================
+# Y-shaped graph (5 nodes per branch + 1 junction)
+# Branch A (stem): A1..A5 -> J
+# Branch B (upper-left): B1..B5 -> J
+# Branch C (upper-right): C1..C5 -> J
+# =========================
 
-# ---------- Parks (5) ----------
+# -------- Junction --------
+- node:
+    name: J
+    pose:
+      position: {x: 0.0, y: 0.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: J_A5
+        node: A5
+      - edge_id: J_B5
+        node: B5
+      - edge_id: J_C5
+        node: C5
+      - edge_id: J_A6
+        node: A6
+
+# -------- Parking nodes) --------
 - node:
     name: Park1
+    pose:
+      position: {x: 0.0, y: -6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park1_A1
+        node: A1
+
+- node:
+    name: Park2
+    pose:
+      position: {x: -2.0, y: -6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park2_A2
+        node: A2
+
+- node:
+    name: Park3
+    pose:
+      position: {x: 2.0, y: -6.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: Park3_A4
+        node: A4
+
+# -------- Branch A (stem, bottom -> up to J) --------
+- node:
+    name: A1
+    pose:
+      position: {x: 0.0, y: -5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A1_A2
+        node: A2
+      - edge_id: A1_Park1
+        node: Park1
+
+- node:
+    name: A2
+    pose:
+      position: {x: 0.0, y: -4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A2_A1
+        node: A1
+      - edge_id: A2_A3
+        node: A3
+      - edge_id: A2_Park2
+        node: Park2
+
+- node:
+    name: A3
+    pose:
+      position: {x: 0.0, y: -3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A3_A2
+        node: A2
+      - edge_id: A3_A4
+        node: A4
+
+
+
+- node:
+    name: A4
+    pose:
+      position: {x: 0.0, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A4_A3
+        node: A3
+      - edge_id: A4_A5
+        node: A5
+      - edge_id: A4_Park3
+        node: Park3
+      - edge_id: A4_D1
+        node: D1
+      - edge_id: A4_D2
+        node: D2
+
+- node:
+    name: A5
+    pose:
+      position: {x: 0.0, y: -1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A5_A4
+        node: A4
+      - edge_id: A5_J
+        node: J
+
+- node:
+    name: A6
+    pose:
+      position: {x: 0.0, y: 1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A6_J
+        node: J
+      - edge_id: A6_A7
+        node: A7
+
+- node:
+    name: A7
+    pose:
+      position: {x: 0.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A7_A6
+        node: A6
+      - edge_id: A7_A8
+        node: A8
+
+- node:
+    name: A8
+    pose:
+      position: {x: 0.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A8_A7
+        node: A7
+      - edge_id: A8_A9
+        node: A9
+
+- node:
+    name: A9
+    pose:
+      position: {x: 0.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A9_A8
+        node: A8
+      - edge_id: A9_A10
+        node: A10
+      - edge_id: A9_B2
+        node: B2
+      - edge_id: A9_C2
+        node: C2
+
+- node:
+    name: A10
+    pose:
+      position: {x: 0.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: A10_A9
+        node: A9
+
+
+
+
+
+# -------- Branch B (upper-left, far -> near J) --------
+- node:
+    name: B1
+    pose:
+      position: {x: -5.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: B1_B2
+        node: B2
+
+- node:
+    name: B2
+    pose:
+      position: {x: -4.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: B2_B1
+        node: B1
+      - edge_id: B2_B3
+        node: B3
+      - edge_id: B2_D1
+        node: D1
+      - edge_id: B2_A9
+        node: A9
+
+- node:
+    name: B3
+    pose:
+      position: {x: -3.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: B3_B2
+        node: B2
+      - edge_id: B3_B4
+        node: B4
+
+- node:
+    name: B4
+    pose:
+      position: {x: -2.0, y: 2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: B4_B3
+        node: B3
+      - edge_id: B4_B5
+        node: B5
+
+- node:
+    name: B5
+    pose:
+      position: {x: -1.0, y: 1.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: B5_B4
+        node: B4
+      - edge_id: B5_J
+        node: J
+
+# -------- Branch C (upper-right, far -> near J) --------
+- node:
+    name: C1
+    pose:
+      position: {x: 5.0, y: 5.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: C1_C2
+        node: C2
+
+- node:
+    name: C2
+    pose:
+      position: {x: 4.0, y: 4.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: C2_C1
+        node: C1
+      - edge_id: C2_C3
+        node: C3
+      - edge_id: C2_A9
+        node: A9
+      - edge_id: C2_D2
+        node: D2
+
+- node:
+    name: C3
+    pose:
+      position: {x: 3.0, y: 3.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
+      custom_type: fixed_orientation
+    edges:
+      - edge_id: C3_C2
+        node: C2
+      - edge_id: C3_C4
+        node: C4
+
+- node:
+    name: C4
     pose:
       position: {x: 2.0, y: 2.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Park1_SW
-        node: SW
-      - edge_id: Park1_Start1
-        node: Start1
+      - edge_id: C4_C3
+        node: C3
+      - edge_id: C4_C5
+        node: C5
 
 - node:
-    name: Park2
+    name: C5
     pose:
-      position: {x: 2.0, y: 10.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
-      custom_type: fixed_orientation
-    edges:
-      - edge_id: Park2_NW
-        node: NW
-      - edge_id: Park2_Spare1
-        node: Spare1
-      - edge_id: Park2_Start1
-        node: Start1
-
-- node:
-    name: Park3
-    pose:
-      position: {x: 10.0, y: 2.0, z: 0.0}
+      position: {x: 1.0, y: 1.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Park3_SE
-        node: SE
-      - edge_id: Park3_Start2
-        node: Start2
+      - edge_id: C5_C4
+        node: C4
+      - edge_id: C5_J
+        node: J
 
 - node:
-    name: Park4
+    name: D1
     pose:
-      position: {x: 10.0, y: 10.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
-      custom_type: fixed_orientation
-    edges:
-      - edge_id: Park4_NE
-        node: NE
-      - edge_id: Park4_Spare2
-        node: Spare2
-      - edge_id: Park4_Start2
-        node: Start2
-
-- node:
-    name: Park5
-    pose:
-      position: {x: 6.0, y: 1.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-      custom_type: fixed_orientation
-    edges:
-      - edge_id: Park5_S
-        node: S
-      - edge_id: Park5_Start1
-        node: Start1
-      - edge_id: Park5_Start2
-        node: Start2
-
-# ---------- Starts / Hubs ----------
-- node:
-    name: Start1
-    pose:
-      position: {x: 5.0, y: 6.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-    edges:
-      - edge_id: Start1_Park1
-        node: Park1
-      - edge_id: Start1_Park2
-        node: Park2
-      - edge_id: Start1_Park5
-        node: Park5
-      - edge_id: Start1_Plaza
-        node: Plaza
-      - edge_id: Start1_Start2
-        node: Start2
-
-- node:
-    name: Start2
-    pose:
-      position: {x: 7.0, y: 6.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-    edges:
-      - edge_id: Start2_Park3
-        node: Park3
-      - edge_id: Start2_Park4
-        node: Park4
-      - edge_id: Start2_Park5
-        node: Park5
-      - edge_id: Start2_Plaza
-        node: Plaza
-      - edge_id: Start2_Start1
-        node: Start1
-
-# ---------- Plaza ----------
-- node:
-    name: Plaza
-    pose:
-      position: {x: 6.0, y: 6.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-    edges:
-      - edge_id: Plaza_Start1
-        node: Start1
-      - edge_id: Plaza_Start2
-        node: Start2
-      - edge_id: Plaza_N
-        node: N
-      - edge_id: Plaza_E
-        node: E
-      - edge_id: Plaza_S
-        node: S
-      - edge_id: Plaza_W
-        node: W
-      - edge_id: Plaza_NE
-        node: NE
-      - edge_id: Plaza_NW
-        node: NW
-      - edge_id: Plaza_SE
-        node: SE
-      - edge_id: Plaza_SW
-        node: SW
-
-# ---------- Ring (N/E/S/W) ----------
-- node:
-    name: N
-    pose:
-      position: {x: 6.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
-    edges:
-      - edge_id: N_Plaza
-        node: Plaza
-      - edge_id: N_NE
-        node: NE
-      - edge_id: N_NW
-        node: NW
-      - edge_id: N_Spare1
-        node: Spare1
-      - edge_id: N_Spare2
-        node: Spare2
-
-- node:
-    name: E
-    pose:
-      position: {x: 9.0, y: 6.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-    edges:
-      - edge_id: E_Plaza
-        node: Plaza
-      - edge_id: E_NE
-        node: NE
-      - edge_id: E_SE
-        node: SE
-
-- node:
-    name: S
-    pose:
-      position: {x: 6.0, y: 3.0, z: 0.0}
+      position: {x: -2.0, y: -2.0, z: 0.0}
       orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
-    edges:
-      - edge_id: S_Plaza
-        node: Plaza
-      - edge_id: S_SE
-        node: SE
-      - edge_id: S_SW
-        node: SW
-      - edge_id: S_Park5
-        node: Park5
-
-- node:
-    name: W
-    pose:
-      position: {x: 3.0, y: 6.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 1.0, w: 0.0}
-    edges:
-      - edge_id: W_Plaza
-        node: Plaza
-      - edge_id: W_NW
-        node: NW
-      - edge_id: W_SW
-        node: SW
-
-# ---------- Corners (NE/NW/SE/SW) ----------
-- node:
-    name: NE
-    pose:
-      position: {x: 9.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
-    edges:
-      - edge_id: NE_N
-        node: N
-      - edge_id: NE_E
-        node: E
-      - edge_id: NE_Plaza
-        node: Plaza
-      - edge_id: NE_Park4
-        node: Park4
-
-- node:
-    name: NW
-    pose:
-      position: {x: 3.0, y: 9.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
-    edges:
-      - edge_id: NW_N
-        node: N
-      - edge_id: NW_W
-        node: W
-      - edge_id: NW_Plaza
-        node: Plaza
-      - edge_id: NW_Park2
-        node: Park2
-
-- node:
-    name: SE
-    pose:
-      position: {x: 9.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
-    edges:
-      - edge_id: SE_S
-        node: S
-      - edge_id: SE_E
-        node: E
-      - edge_id: SE_Plaza
-        node: Plaza
-      - edge_id: SE_Park3
-        node: Park3
-
-- node:
-    name: SW
-    pose:
-      position: {x: 3.0, y: 3.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
-    edges:
-      - edge_id: SW_S
-        node: S
-      - edge_id: SW_W
-        node: W
-      - edge_id: SW_Plaza
-        node: Plaza
-      - edge_id: SW_Park1
-        node: Park1
-
-# ---------- Docks / Spares ----------
-- node:
-    name: Spare1
-    pose:
-      position: {x: 4.0, y: 11.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Spare1_N
-        node: N
-      - edge_id: Spare1_NW
-        node: NW
-      - edge_id: Spare1_Park2
-        node: Park2
+      - edge_id: D1_A4
+        node: A4
+      - edge_id: D1_B2
+        node: B2
 
 - node:
-    name: Spare2
+    name: D2
     pose:
-      position: {x: 8.0, y: 11.0, z: 0.0}
-      orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}
+      position: {x: 2.0, y: -2.0, z: 0.0}
+      orientation: {x: 0.0, y: 0.0, z: 0.7071, w: 0.7071}
       custom_type: fixed_orientation
     edges:
-      - edge_id: Spare2_N
-        node: N
-      - edge_id: Spare2_NE
-        node: NE
-      - edge_id: Spare2_Park4
-        node: Park4
+      - edge_id: D2_A4
+        node: A4
+      - edge_id: D2_C2
+        node: C2
